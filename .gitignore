@@ -1,0 +1,9 @@
+
+# Backup files
+*~
+
+# Node modules
+/node_modules/
+
+# ignores db, design, tests, testdata, code snippets, notes, old, others
+/[0-9][0-9]_*/

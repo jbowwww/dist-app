@@ -1,0 +1,13 @@
+<form name="jsonViewSettings">
+	<span>Show:</span>
+	<input name="showPublic" checked type="checkbox" onclick="setDisplay('.public', this.checked)" />
+	<label for="showPublic">Public</label>
+	<input name="showPrivate" checked type="checkbox" onclick="setDisplay('.private', this.checked)" />
+	<label for="showPrivate">Private</label>
+	<input name="showClass" checked type="checkbox" onclick="setDisplay('.class', this.checked)" />
+	<label for="showClass">Class</label>
+	<input name="showFunction" checked type="checkbox" onclick="setDisplay('.function', this.checked)" />
+	<label for="showFunction">Function</label>
+	<input name="showPrototypeMembers" checked type="checkbox" onclick="setDisplay('.prototype', this.checked)" />
+	<label for="showPrototypeMembers">Prototype Members</label>
+</form>

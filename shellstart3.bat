@@ -1,0 +1,3 @@
+C:\Windows\System32\cmd.exe /k "C:\Program\\ Files\nodejs\nodevars.bat && cd C:\Users\jk\Code\Projects\Node\dist-app && mongopath.bat && mongostart.bat"
+C:\Windows\System32\cmd.exe /k "C:\Program\\ Files\nodejs\nodevars.bat && cd C:\Users\jk\Code\Projects\Node\dist-app && nodemon bin/www"
+C:\Windows\System32\cmd.exe /k "C:\Program\\ Files\nodejs\nodevars.bat && cd C:\Users\jk\Code\Projects\Node\dist-app && mongopath.bat && mongo.exe"

@@ -1,0 +1,60 @@
+body {
+  padding: 50px;
+  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+}
+
+a {
+  color: #00B7FF;
+}
+
+.tree {
+  min-width: 330px;
+	max-width: 520px;
+	width: auto;
+  height: 440px;
+  border: 1px solid grey;
+  background: lightgrey;
+  overflow-x: scroll;
+}
+
+.treeItem {
+  width: auto;
+}
+.item {
+	width: auto;
+}
+.subtree {
+  width: auto;
+  display: none;
+  padding-left: 18px;
+}
+.subtree.expanded {
+  display: block;
+}
+.subtree.hideRoot {
+  padding-left: 0px;
+}
+.value {
+  float: right;
+}
+
+.expander {
+  display: inline-block;
+  background: url('/images/expand.gif');
+  min-width: 17px;
+  max-width: 17px;
+  min-height: 17px;
+  max-height: 17px;
+}
+.expander.expanded {
+  background: url('/images/collapse.gif');
+}
+.spacer {
+	display: inline-block;
+	min-width: 17px;
+	max-width: 17px;
+	width: 17px;
+  min-height: 17px;
+  max-height: 17px;
+	height: 17px;
+}

@@ -1,0 +1,39 @@
+<%
+
+(function jsonview(root, instances) {
+	if (!instances) {
+		var instances = new WeakMap();
+	}
+
+	for (var name in root) {
+		var value = root[name];
+		var valueType = typeof value;
+		var isObject = valueType === 'object';
+		if (isObject) {
+			var isCached = instances.has(value);
+			if (!isCached) {
+				instances.set(value, new Date().getTime().substring(7));
+			}
+			var objectId = instances[value];
+			if (!isCached) {
+	%><a href="#" onClick="toggleDisplay('<%= objectId %>')"><%
+			}
+	%>
+	<div class="item">
+		<span class="name"><%= name %></span>
+	<%
+		switch (valueType) {
+			case 'object': value = '' + value.prototype.name + ' #' + objectId + ' (' + Object.keys(value).length + ')'; break;
+			case 'string': value = '"' + value + '"'; break;
+			default: break;
+		}
+	%>
+		<span class="value"><%= value %></span>
+<%
+		if (!isCached) {
+%><div class="subtree" id="subtree-<%= objectId %>"><%
+	jsonview(value, instances);
+%></div><%
+		}
+%>
+})(root, new WeakMap());

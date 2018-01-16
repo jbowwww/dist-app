@@ -1,0 +1,71 @@
+<%
+// const util = require('util');
+	if (/*!root || */typeof root !== 'object' && typeof root !== 'function')	// typeof should actuallly cover case where root == null or root == undefined??
+		throw new Error(`jsonview() EJS called with root == '${root?root.toString():'(null)'} (type '${typeof root}'`);
+	if (!nodeFunc)
+		var nodeFunc = (node) => true;//!node.isFunction || node.isOwn; ;//{ return /* (node.name.charAt(0) !== '_' || node.name === '__type') &&  node.name !== 'constructor'; }*/
+	if (!nodeIdGenerator)
+		var nodeIdGenerator = (node) => (new Date().getMilliseconds() + Math.floor(Math.random() * 1e8) + 1e8).toString(16).toUpperCase();//.substring(0);
+	var masterInstances = new WeakMap();
+	
+	(function jsonview(root, instances, nodeFunc, nodeIdGenerator) {
+		var isTopLevel = instances === null;
+		for (var name of Object.keys(root).concat(['__proto__','prototype'])) {
+			if (isTopLevel)
+				instances = new WeakMap();
+			var value = root[name];
+			var node = { name, value };
+			node.isOwn = ({}).hasOwnProperty.call(root, name);
+			node.isNull = value === null,
+			node.valueType = typeof value;
+			node.isObject = typeof value === 'object';
+			node.isFunction = typeof value === 'function';
+			if (node.isFunction) {
+				var nameFirstChar = value.name.charAt(0);
+				node.isClass = nameFirstChar >= 'A' && nameFirstChar <= 'Z';
+			} else {
+				node.isClass = false;
+			}
+			// node.isClass = node.isFunction && typeof value.prototype.constructor === 'undefined';//(value.prototype.constructor === value);
+			node.isUndefined = typeof value === 'undefined';
+			node.isDate = node.isObject && (value instanceof Date);
+			node.subValueCount = (!node.isNull && !node.isUndefined && (node.isObject || node.isClass) ? Object.keys(value).length : undefined);
+			node.isCached = (node.isObject || node.isClass) && !node.isNull && !node.isUndefined && !node.isDate && instances.has(value);
+			node.objectId = (node.isCached ) ? instances.get(value) : (node.isObject || node.isClass) ? nodeIdGenerator(node) : undefined;
+			node.isPrivate = node.name.startsWith('_') && node.name != '__type';
+			node.isPublic = !node.isPrivate;
+			// console.debug(`node: ${JSON.stringify(node)}`);
+			if (!node.isCached && (node.isObject || node.isClass) && !node.isNull && !node.isUndefined && !node.isDate) {
+				masterInstances.set(value, node.objectId);
+				instances.set(value, node.objectId);		// TODO: Parameterize the object isntance cache too? meh
+			}
+			if (nodeFunc(node)) {
+				name = node.name;
+				value = node.value;
+				if ((node.isObject || node.isClass) && !node.isCached && !node.isNull && !node.isUndefined && !node.isDate) { %>
+	<a href="#" onClick="toggleDisplay(this); return false;">
+		<%	}
+		var itemProto = node.isOwn ? '' : 'prototype ';
+		var itemCategory = node.isClass ? 'class' : node.isFunction ? 'function' :	node.isPrivate ? 'private' : 'public'; %>
+		<div class="item <%= itemProto %> <%= itemCategory %>">
+			<span class="name"><%= name %></span>
+			<span class="value"><%-
+				(node.isUndefined ? '(undefined)' :
+				 node.isNull ? '(null)' :
+				 node.isDate ? value.toISOString() :
+				 node.valueType === 'string' ? `"${value}"` :
+				 node.isClass ? `<span class="type">class ${value.name}</span> <span class="count">(${node.subValueCount})</span>` :
+				 node.isFunction ? `<span class="type">Function( ${value.length} )</span> <span class="count"><a href="#" alt="Function code">...</a></span>` :
+				 node.isObject ? `<span class="type">${(value.prototype||Object).name}</span> <span class="id">#${node.objectId}</span> <span class="count">(${node.subValueCount})</span>` :
+				 value.toString()) %>
+			</span>
+		</div>
+		<% if ((node.isObject || node.isClass) && !node.isCached && !node.isNull && !node.isUndefined && !node.isDate) {
+%></a>
+	<div class="subtree <%= itemCategory %>">
+			<% jsonview(value, instances, nodeFunc, nodeIdGenerator); %>
+	</div>
+			<% }
+			}
+		}
+	})(root, null, nodeFunc, nodeIdGenerator); %>

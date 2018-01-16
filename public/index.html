@@ -1,0 +1,11 @@
+<html>
+   <head>
+      <script src="js/ejs.js"></script>
+   </head>
+   <body>
+			<div id="jsonview"></div>
+			<script>				
+         ejs.renderFile({url:"ejs/jsonview.ejs"}, (err) => console.error('ejs.renderFile:', err)).update('jsonview', {root: { a: 1, b: "2", c: () =>{}}});
+      </script>
+   </body>
+</html>
