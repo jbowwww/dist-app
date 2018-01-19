@@ -74,6 +74,7 @@ var app = {
 
 	markPoint(name, doStat) {
 		this.timestamps.mark(name);
+		console.verbose(`markPoint: ${name}: ${this.timestamps.end[name]} ( duration=${this.timestamps.end[name] - this.timestamps.start} start=${this.timestamps.start} )`)
 		doStat && this._debugIntervalOptions && this._debugIntervalOptions.fn(name);
 	},
 	getStats() {
@@ -96,7 +97,7 @@ var app = {
 
 process.on('SIGINT', () => {																									// this should either e handled at app level, or only do the db
 	console.warn(`Process got SIGINT, closing db and exiting`);									// disconnect here and let app do rquired cleanup&exit
-	console.debug(`mongoose.connection: ${inspect(mongoose.connection)}`);
+	console.debug(`mongoose.connection: ${inspect(mongo.connection)}`);
 	//mongoose.connection.close(() => process.exit(0));														// should exit code be !=0?
 	app.exit(0);
 });

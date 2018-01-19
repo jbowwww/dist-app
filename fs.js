@@ -54,7 +54,7 @@ function iterate(path, options/* , pipeStream */) {
 	var self = mixin({
 		root: path,
 		rootDepth: pathDepth(path),
-		paths: [path], //	{ push() {} },
+		paths: [path],
 		errors: []
 	}, new require('stream').Readable({
 		objectMode: true,
@@ -77,7 +77,7 @@ function iterate(path, options/* , pipeStream */) {
 				try {
 					fs.lstat(path, (err, stats) => {
 						if (err) return nextHandleError(err);
-						var item = { path, stats, type: stats.isDirectory() ? 'dir' : stats.isFile() ? 'file' : '' };
+						var item = { path, stats, type: stats.isDirectory() ? 'dir' : stats.isFile() ? 'file' : 'unknown' };
 						if (!stats.isDirectory()) return self.push(item);
 						var currentDepth = pathDepth(item.path) - self.rootDepth + 1;	// +1 because below here next files are read from this dir
 						if ((options.maxDepth === 0) || (currentDepth <= options.maxDepth)) {

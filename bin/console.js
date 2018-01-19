@@ -22,35 +22,32 @@ var scanParameters = [
 var writers = {};
 
 app.runTask(function appMain() {
-	writers = _.mapValues(app.models.fs, (model, modelName) => model.bulkWriter({ asyncTimeResolution: 1200 }).asStream());
-	app.status = { file: { current: { path: '' }, totals: { size: 0, count: 0 } }, dir: { current: { path: '' }, totals: { size: 0, count: 0 } }, unknown: { current: { path: '' }, totals: { size: 0, count: 0 } } };
-
-	console.log(`${scanParameters.length} FS scan targets: ${inspectPretty(scanParameters)}`);
 	var startTime = new Date();
+	// writers = _.mapValues(app.models.fs, (model, modelName) => model.bulkWriter({ asyncTimeResolution: 1200 }).asStream());
+	app.status = {
+		file: { current: { path: '' }, totals: { size: 0, count: 0, inc(size) { this.count++; this.size += size; } } },
+		dir: { current: { path: '' }, totals: { size: 0, count: 0, inc(size) { this.count++; this.size += size; } } },
+		unknown: { current: { path: '' }, totals: { size: 0, count: 0, inc(size) { this.count++; this.size += size; } } }
+	};
+	console.log(`${scanParameters.length} FS scan targets: ${inspectPretty(scanParameters)}`);
 	return Q.all(scanParameters.map((scan, scanIndex) => Q.Promise((resolve, reject) => {
 		console.log(`Scanning FS to depth=${scan.maxDepth} at '${scan.path}' ...`);
-		fs.iterate(scan.path, scan)				// { maxDepth: 0 })
-		.on('error', err => app.onWarning(err, 'fs.iterate stream error'))
-		.on('end', () => { app.markPoint('fsIter', false); console.log(`Finished scanning '${scan.path}'`); })
+		fs.iterate(scan.path, scan)
+		.on('end', () => app.markPoint('fsIterEnd', false))
 		.pipe(objStream((data, enc, cb) => {
-			preProcess(data);
-			if (!data.type) {
-				console.warn(`data.type=${data.type} for path ${data.path}`);
-				return cb();
-			} else {
-				app.models.fs[data.type].findOrCreate({ /* type: data.type, */ path: data.path }, data)
-				.then(data => data.type === 'file' ? data.ensureCurrentHash() : data)
-				.then(data => { data.store(writers[data.type] /*, cb */); cb(); })		// doesn't seem to work if i pass cb to data.store() to use as a callback... nfi why..
-				.catch(err => app.onWarning(err, `models.${data.type} op error`, cb))
-				.done();
-			}
-		})
-		.on('error', err => app.onWarning(err, 'through2 stream error'))
+			app.status[data.type].totals.inc(data.stats.size || 0)
+			app.models.fs.fs.findOrCreate({ type: data.type, path: data.path, isDeleted: { '$ne': true } }, data)
+			.then(data => data.type === 'file' ? data.ensureCurrentHash() : data)
+			.then(data => data.save())	//writers[data.type] /*, cb */); process.nextTick(cb); })		// doesn't seem to work if i pass cb to data.store() to use as a callback... nfi why..
+			.catch(err => app.onWarning(err, `models.${data.type} op error`))
+			.then(() => cb())
+			.done();
+		}))
 		.on('finish', () => {
-			app.markPoint('stream', false);
-			console.verbose(`Finished processing data from '${scan.path}'`);
+			app.markPoint('streamFinish', false);
 			resolve(startTime);
-		}));
+		})
+		.on('error', err => app.onWarning(err, 'through2 stream error'));
 	}).then(() => {
 		console.log(`Testing unmodified FS DB entries for existence...`)
 		var deleted = {file: 0, dir: 0 };
@@ -60,8 +57,8 @@ app.runTask(function appMain() {
 		return Q.all([ 'file', 'dir' ].map(dataType => {
 			return promisifyEmitter(app.models.fs[dataType].find({
 				path: pathRegex,
-				__ts_u: { $lte: startTime },
-				deleted: { $ne: true }
+				updatedAt: { $lte: app.timestamps.start },
+				isDeleted: { $ne: true }
 			})//, { $set: { deleted: true }})
 			.cursor()
 			.on('data', deletedFile => {
@@ -85,19 +82,11 @@ app.runTask(function appMain() {
 	.then(() => Q.all(_.values(writers).map(writer => writer.endWait())))
 	.then(() => { console.verbose(`Closed writers`); app.markPoint('writers'); });
 
-	function preProcess(fsEntry) {
-		var type = fsEntry.stats.isDirectory() ? 'dir' : fsEntry.stats.isFile() ? 'file' : 'unknown';
-		// app.status[type].current = fsEntry;
-		app.status[type].totals.count++;
-		app.status[type].totals.size += fsEntry.stats.size || 0;
-		return type;
-	}
-
 }, {
 	//debug
 	interval: 40000,
 	fn(prefix = '') {
-		console.verbose(`---- stats ---- ${prefix}\napp.models.fs.dir.stats: ${inspect(app.models.fs.dir.stats)}\napp.models.fs.file.stats: ${inspect(app.models.fs.file.stats)}\n${writers.file._getDebug()}\n${writers.dir._getDebug()}\napp.status: ${inspect(app.status)}\n${app.timestamps}\n-- end stats --\n`);
+		console.verbose(`---- stats ---- ${prefix}\napp.models.fs.dir.stats: ${inspect(app.models.fs.dir.stats)}\napp.models.fs.file.stats: ${inspect(app.models.fs.file.stats)}\napp.status: ${inspect(app.status)}\n${app.timestamps}\n-- end stats --\n`);	//\n${writers.file._getDebug()}\n${writers.dir._getDebug()}
 	}
 });
 

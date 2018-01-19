@@ -23,7 +23,7 @@ var fsStatsSchema = new mongo.Schema({
 	"atime" : Date,
 	"mtime" : Date,
 	"ctime" : Date,
-	"birthtime" : Number,
+	"birthtime" : Date,
 	"atimeMs" : Number,
 	"mtimeMs" : Number,
 	"ctimeMs" : Number,
@@ -31,16 +31,15 @@ var fsStatsSchema = new mongo.Schema({
 }, { _id: false});
 
 var	fsSchema = new mongo.Schema({
-	'__ts_c': { type: Date },
-	'__ts_u': { type: Date },
 	path: { type: String, unique: true, index: true },
-	deleted: { type: Boolean, required: false },	//, default: null },
-	stats : fsStatsSchema
+	stats : fsStatsSchema,
 }, { discriminatorKey: 'type' });
+fsSchema.plugin(mongo.globalPlugin);
+fsSchema.virtual('isDeleted', function () { return this.deletedAt && this.deletedAt <= Date.now(); });
 fsSchema.query = {
 	findByPath(path) { return this.where('path', path); },
-	older(age, currentTime = moment().utc()) { return this.where('__ts_u').lt(currentTime - age);	},
-	younger(age, currentTime = Date.now()) { return this.where('__ts_u').gt(currentTime - age); }
+	older(age, currentTime = moment().utc()) { return this.where('updatedAt').lt(currentTime - age); },
+	younger(age, currentTime = Date.now()) { return this.where('deletedAt').gt(currentTime - age); }
 };
 var FS = mongo.model('fs', fsSchema);
 
@@ -48,62 +47,60 @@ var fileSchema = new mongo.Schema({
 	hash: { type: String, required: false, default: null }
 });
 fileSchema.query.hasHash = function hashHash() { return this.exists('hash'); };
-fileSchema.methods = {
-	/* Ensures the file doc ('this') has a hash value, and that the doc's __ts_u is more recent than the file's mtime ('stats.mtime')
-	 * returns: the file/this, with hash calculated
-	 */
-	ensureCurrentHash(cb) {
-		var debugPrefix = `[${typeof this} ${this.constructor.name}]`;
-		var file = this;
-		var model = this.constructor;
-		if (!model.stats.ensureCurrentHash) {
-			model.stats.ensureCurrentHash = { hashValid: 0, hashUpdated: 0, hashCreated: 0, errors: [], get total() { return this.hashValid + this.hashUpdated + this.hashCreated + this.errors.length; } };
-		}
-		if (!model._hashQueue) {
-			model._hashQueue = {
-				push(data) {
-					return fs.hash(file.path).then((hash) => {
-						file.hash = hash;
-						console.verbose(`${debugPrefix}.ensureCurrentHash: computed file.hash=..${hash.substr(-6)}`);
-						return file;
-					});//.catch(err=>reject(err))//done();
-				}
-			};
-		}
-		return Q.Promise((resolve, reject, notify) => {
-			var oldHash = file.hash;
-			console.verbose(`${debugPrefix}.ensureCurrentHash: file='${file.path}' modifiedPaths=${file.modifiedPaths().join(' ')} tsu=${file.__ts_u} mtime=${file.stats.mtime} tsu-mtime=${file.__ts_u - file.stats.mtime}`);
-			if (!oldHash || !file.__ts_u || file.isModified('stats.mtime')  || (file.__ts_u < (file.stats.mtime))) {	// need to add file.isModified() to this list of conditions?
-				if (!oldHash) { console.verbose(`${debugPrefix}.ensureCurrentHash: undefined file.hash, hashing...`); }
-				else { console.verbose(`${debugPrefix}.ensureCurrentHash: outdated file.hash=..${file.hash.substr(-6)}, hashing...`); }
-				// return model._hashQueue.push(file).then(file => { if (cb) cb(null, file); return file; });
-				fs.hash(file.path).then((hash) => {
-					if (!oldHash) { model.stats.ensureCurrentHash.hashCreated++; }
-					else { model.stats.ensureCurrentHash.hashUpdated++; }
+/* Ensures the file doc ('this') has a hash value, and that the doc's updatedAt is more recent than the file's mtime ('stats.mtime')
+ * returns: the file/this, with hash calculated
+ */
+fileSchema.methods.ensureCurrentHash = function ensureCurrentHash(cb) {
+	var debugPrefix = `[${typeof this} ${this.constructor.name}]`;
+	var file = this;
+	var model = this.constructor;
+	if (!model.stats.ensureCurrentHash) {
+		model.stats.ensureCurrentHash = { hashValid: 0, hashUpdated: 0, hashCreated: 0, errors: [], get total() { return this.hashValid + this.hashUpdated + this.hashCreated + this.errors.length; } };
+	}
+	if (!model._hashQueue) {
+		model._hashQueue = {
+			push(data) {
+				return fs.hash(file.path).then((hash) => {
 					file.hash = hash;
 					console.verbose(`${debugPrefix}.ensureCurrentHash: computed file.hash=..${hash.substr(-6)}`);
-					resolve(file);
-				})
-				.catch(err => ensureCurrentHashHandleError(err, 'hash error', reject))
-				.done();
-			} else {
-				model.stats.ensureCurrentHash.hashValid++;
-				console.verbose(`${debugPrefix}.ensureCurrentHash: current file.hash=..${file.hash.substr(-6)}, no action required`);
-				resolve(file);
+					return file;
+				});//.catch(err=>reject(err))//done();
 			}
-		});
-
-		function ensureCurrentHashHandleError(err, prefix, cb) {
-			if (typeof prefix === 'function') {
-				cb = prefix;
-				prefix = 'Error';
-			}
-			console.warn(prefix + ': ' + err);//.stack||err.message||err);
-			model.stats.ensureCurrentHash.errors.push(err);
-			if (cb) process.nextTick(() => cb(err));
-		}
+		};
 	}
-}
+	return Q.Promise((resolve, reject, notify) => {
+		var oldHash = file.hash;
+		console.verbose(`${debugPrefix}.ensureCurrentHash: file='${file.path}' modifiedPaths=${file.modifiedPaths().join(' ')} tsu=${file.updatedAt} mtime=${file.stats.mtime} tsu-mtime=${file.updatedAt - file.stats.mtime}`);
+		if (!oldHash || !file.updatedAt || file.isModified('stats.mtime')  || (file.updatedAt < (file.stats.mtime))) {	// need to add file.isModified() to this list of conditions?
+			if (!oldHash) { console.verbose(`${debugPrefix}.ensureCurrentHash: undefined file.hash, hashing...`); }
+			else { console.verbose(`${debugPrefix}.ensureCurrentHash: outdated file.hash=..${file.hash.substr(-6)}, hashing...`); }
+			// return model._hashQueue.push(file).then(file => { if (cb) cb(null, file); return file; });
+			fs.hash(file.path).then((hash) => {
+				if (!oldHash) { model.stats.ensureCurrentHash.hashCreated++; }
+				else { model.stats.ensureCurrentHash.hashUpdated++; }
+				file.hash = hash;
+				console.verbose(`${debugPrefix}.ensureCurrentHash: computed file.hash=..${hash.substr(-6)}`);
+				resolve(file);
+			})
+			.catch(err => ensureCurrentHashHandleError(err, 'hash error', reject))
+			.done();
+		} else {
+			model.stats.ensureCurrentHash.hashValid++;
+			console.verbose(`${debugPrefix}.ensureCurrentHash: current file.hash=..${file.hash.substr(-6)}, no action required`);
+			resolve(file);
+		}
+	});
+
+	function ensureCurrentHashHandleError(err, prefix, cb) {
+		if (typeof prefix === 'function') {
+			cb = prefix;
+			prefix = 'Error';
+		}
+		console.warn(prefix + ': ' + err);//.stack||err.message||err);
+		model.stats.ensureCurrentHash.errors.push(err);
+		if (cb) process.nextTick(() => cb(err));
+	}
+};
 
 /* 1612949298: TOOD: instead of storing raw aggregation operation pipeline arrays, if you could somehow hijack/override the Aggregate(?) returned by
  * model.aggregate, and set its prototype to a new object that contains functions of the same names as below, and inherits from the original
@@ -127,9 +124,9 @@ fileSchema.aggregates.duplicatesSummary = [
   { $group: { _id: null, totalSize: { $sum: { $divide: [ '$groupSize', 1024*1024*1024 ] } }, totalCount: { $sum: "$count" }, totalGroups: {$sum: 1} } },
   { $project: { totalSize: { $concat: [{ $substr: ['$totalSize', 0, 100 ]}, ' GB' ] }, totalCount: '$totalCount', totalGroups: '$totalGroups', avgGroupSize: {$concat: [ { $substr: [{ $divide: [ '$totalSize', '$totalGroups' ] }, 0, 10] }, ' GB']} } }
 ];
+
 var File = FS.discriminator('file', fileSchema);
-
-
 var Dir = FS.discriminator('dir', new mongo.Schema({}));
+var Unknown = FS.discriminator('unknown', new mongo.Schema({}));
 
-module.exports = { file: File, dir: Dir };
+module.exports = { fs: FS, file: File, dir: Dir, unknown: Unknown };
