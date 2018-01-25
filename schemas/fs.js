@@ -34,8 +34,7 @@ var	fsSchema = new mongo.Schema({
 	path: { type: String, unique: true, index: true },
 	stats : fsStatsSchema,
 }, { discriminatorKey: 'type' });
-fsSchema.plugin(mongo.globalPlugin);
-fsSchema.virtual('isDeleted', function () { return this.deletedAt && this.deletedAt <= Date.now(); });
+fsSchema.plugin(mongo.globalPlugin);	// could also inherit a base schema from mongo.Schema (prototypal style/util.iherits) - might be neater
 fsSchema.query = {
 	findByPath(path) { return this.where('path', path); },
 	older(age, currentTime = moment().utc()) { return this.where('updatedAt').lt(currentTime - age); },

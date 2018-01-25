@@ -26,21 +26,13 @@ Timestamps.prototype.mark = function(markName = 'end') {
 var durationFormat = 'd [days] h [hours] m [mins] s [secs]';
 Timestamps.prototype.toString = function() {
 	var now = moment();
-	var s = `Timestamps:\n  Created:\t${this.created.format()} ( ${moment.duration(now - this.created).format(durationFormat)} ago )\n  Start:\t${this.start.format()} ( ${moment.duration(now - this.start).format(durationFormat)} ago )${_.keys(this.end).length?'\n  Marks:':''}`;
+	var s = `Timestamps @ ${now.format()}:\n  Created${this.start===this.created?'/Start:':':\t'}${this.created.format()} (${moment.duration(now - this.created).format(durationFormat)} ago)`;
+	if (this.start !== this.created) {
+		s += `\nStart:\t${this.start.format()} (${moment.duration(now - this.start).format(durationFormat)} ago)${_.keys(this.end).length?'\n  Marks:':''}`;
+	}
 	for (var e in this.end) {
 		var v = this.end[e];
-		s += '\n    ' + padString(12, e + ':') + '   ' + v.format() + ' ( ' + moment.duration(v - this.start).format(durationFormat) + ' from start )';
+		s += '\n    ' + padString(12, e + ':') + '   ' + v.format() + ' (' + moment.duration(v - this.start).format(durationFormat) + ' from start)';
 	}
 	return s;
 }
-
-// util.inherits
-// var _ts = {
-	// start: new Date(),
-	// endFsIter: null,
-	// endBulkWriters: null,
-	// endAll: null,
-	// toString() {
-		// return `Start=${this.start}` + (this.endFsIter != null ? ` endFsIter=${this.endFsIter.toTimeString()}(${this.endFsIter-this.start})` : '') + (this.endBulkWriters != null ? ` endBulkWriters=${this.endBulkWriters.toTimeString()}(${this.endBulkWriters-this.start})` : '') + (this.endAll != null ? ` endAll=${this.endAll}(${this.endAll-this.start})` : '');
-	// }
-// };

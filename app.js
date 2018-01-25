@@ -95,14 +95,12 @@ var app = {
 
 };
 
-process.on('SIGINT', () => {																									// this should either e handled at app level, or only do the db
-	console.warn(`Process got SIGINT, closing db and exiting`);									// disconnect here and let app do rquired cleanup&exit
-	console.debug(`mongoose.connection: ${inspect(mongo.connection)}`);
-	//mongoose.connection.close(() => process.exit(0));														// should exit code be !=0?
+process.on('SIGINT', () => {
+	console.warn(`Process got SIGINT, closing db and exiting`);
 	app.exit(0);
 });
 
-app._init('db', mongo.connect(app.options.db.url).then(r => r));
+app._init('db', mongo.connect(app.options.db.url));
 app._init('baseHash', fs.hash(fs.path.resolve(__dirname, __filename)));
 
 var $hashes = [];
