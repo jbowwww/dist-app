@@ -7,7 +7,6 @@ const formatSize = require('../utility.js').formatSize;
 const _ = require('lodash');
 const mixin = require('../utility.js').mixin;
 const fs = require('../fs.js');
-const mongo = require ('../mongo.js');
 const objStream = mixin(require('through2'), {
 	// spy: require('through2-spy'),
 	// filter: require('through2-filter')

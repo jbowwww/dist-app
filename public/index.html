@@ -1,11 +1,8 @@
 <html>
    <head>
-      <script src="js/ejs.js"></script>
+       <title>dist-app dupe finder</title>
    </head>
    <body>
-			<div id="jsonview"></div>
-			<script>				
-         ejs.renderFile({url:"ejs/jsonview.ejs"}, (err) => console.error('ejs.renderFile:', err)).update('jsonview', {root: { a: 1, b: "2", c: () =>{}}});
-      </script>
+		<div id="root">&nbsp;</div>
    </body>
 </html>

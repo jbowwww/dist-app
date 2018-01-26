@@ -96,16 +96,17 @@ function iterate(path, options/* , pipeStream */) {
 					return nextHandleError(err);
 				}
 				function nextHandleError(err) {
-					console.warn(`iterate: ${err.stack||err}`);
+					// console.warn(`iterate: ${err.stack||err}`);
 					self.errors.push(err);
+					process.nextTick(() => self.emit('error', err));
 					return next();//1;
 				}
 			})();
 		}
 	}))
-	.on('close', (...args) => console.verbose(`iterate:close: ${inspect(args)}`))
-	.on('end', (...args) => console.verbose(`iterate:end: ${inspect(args)}`))
-	.on('error', (err, ...args) => console.warn(`iterate:error: err=${err.stack||err} ${inspect(args)}`))
+	.on('close', (...args) => console.verbose(`iterate: close: ${inspect(args)}`))
+	.on('end', (...args) => console.verbose(`iterate: end: ${inspect(args)}`))
+	.on('error', (err, ...args) => console.warn(`iterate: err: ${err.stack||err} ${inspect(args)}`))
 	var r = self;//promisifyEmitter(self, { errorEvent: null });
 	r.promisePipe = function(writeable) {  return promisifyEmitter(r.pipe(writeable), { errorEvent: null }); };
 	// r.then((...args) => { console.verbose(`iterate.then: ${inspect(args)}`); });

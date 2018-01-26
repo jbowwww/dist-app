@@ -1,7 +1,7 @@
 
 const console = require('./stdio.js').Get('app', { minLevel: 'verbose' });		// debug verbose log
 const util = require('./util');
-const inspect =	require('./utility.js').makeInspect({ depth: 1, compact: true });
+const inspect =	require('./utility.js').makeInspect({ depth: 1, compact: false /* true */ });
 // const inspect2 = require('./utility.js').makeInspect({ depth: 3, compact: false });
 const mixin = require('./utility.js').mixin;
 const promisifyEmitter = require('./utility.js').promisifyEmitter;
@@ -14,7 +14,8 @@ const objStream = mixin(require('through2'), {
 const fs = require('./fs.js');
 const Collection = require('./Collection.js');
 const Q = require('./q.js');
-const mongo = require('./mongo.js');
+const mongoose = require('mongoose');
+mongoose.Promise = Q.Promise;
 const express = require('express');
 const Timestamps = require('./timestamps.js');
 
@@ -72,6 +73,27 @@ var app = {
 	},
 	_$inits: [],
 
+	loadSchemas() {
+		var $hashes = [];
+		return promisifyEmitter(fs.iterate(this.options.schemaPath).on('data', file => {
+			console.debug(`fs.iterate.on('data'): file.path='${file.path}'`);
+			if (file.stats.isFile() && file.path.endsWith('.js')) {
+				var module, moduleName = fs.path.basename(file.path, '.js');
+				try {
+					module = require(file.path);
+					Object.defineProperty(module, 'name', { value: moduleName });
+					Object.defineProperty(module, 'path', { value: file.path });
+				} catch (err) {
+					return console.warn(`Error in module '${moduleName}': ${err.stack||err}`);
+				}
+				$hashes.push( fs.hash(file.path).then(hash => {
+					console.verbose(`Schema module '${moduleName}': hash=${hash}`);
+					Object.defineProperty(module, 'hash', { value: hash });
+					this.models[moduleName] = module;
+				}));
+			}
+		})).then(() => Q.all($hashes));
+	},
 	markPoint(name, doStat) {
 		this.timestamps.mark(name);
 		console.verbose(`markPoint: ${name}: ${this.timestamps.end[name]} ( duration=${this.timestamps.end[name] - this.timestamps.start} start=${this.timestamps.start} )`)
@@ -100,54 +122,43 @@ process.on('SIGINT', () => {
 	app.exit(0);
 });
 
-app._init('db', mongo.connect(app.options.db.url));
+app._init('db', mongoose.connect(app.options.db.url));
 app._init('baseHash', fs.hash(fs.path.resolve(__dirname, __filename)));
-
-var $hashes = [];
-app._init(promisifyEmitter(fs.iterate(app.options.schemaPath).on('data', file => {
-	console.debug(`fs.iterate.on('data'): file.path='${file.path}'`);
-	if (file.stats.isFile() && file.path.endsWith('.js')) {
-		var module, moduleName = fs.path.basename(file.path, '.js');
-		try {
-			module = require(file.path);
-			Object.defineProperty(module, 'name', { value: moduleName });
-			Object.defineProperty(module, 'path', { value: file.path });
-		} catch (err) {
-			return console.warn(`Error in module '${moduleName}': ${err.stack||err}`);
-		}
-		$hashes.push( fs.hash(file.path).then(hash => {
-			console.verbose(`Schema module '${moduleName}': hash=${hash}`);
-			Object.defineProperty(module, 'hash', { value: hash });
-			app.models[moduleName] = module;
-		}));
-	}
-})).then(() => Q.all($hashes)));
+app._init('schemas', app.loadSchemas());
 
 function isPromise(pr) {
 	return typeof pr === 'object' && typeof pr.then === 'function';// && pr.put;
 }
 
-app.h = express().use(function httpLogger(req, res, next) {	// dont think i need to call next() if i dont declare it?
+app.h = express()
+.use(function httpLogger(req, res, next) {	// dont think i need to call next() if i dont declare it?
 	console.log(`HTTP ${req.method} ${req.originalUrl}`);
 	next();
-}).get('/quit', function (req, res) {
+})
+.use('/', express.static(fs.path.join(__dirname, '/build')))
+.get('/quit', function (req, res) {
 	res.send('Quit');
 	console.log('Quit via HTTP GET');
 	app._appExit.resolve();
-}).get('/debug', function (req, res) { res.json(app.getStats()); })
+})
+.get('/debug', function (req, res) {
+	res.json(app.getStats());
+})
 .get('/db/:moduleName/:modelName', function(req, res) {
 	var model = app.models[req.params.moduleName][req.params.modelName];
 	model.find().then(results => {
 		res.json(results);
 	}).catch(err => app.onError(err)).done();
-}).get('/db/:moduleName/:modelName/:aggregate', function(req, res) {
+})
+.get('/db/:moduleName/:modelName/:aggregate', function(req, res) {
 	var moduleName = req.params.moduleName;
 	var modelName = req.params.modelName;
 	var aggName = req.params.aggregate;
 	var model = app.models[moduleName][modelName];
-	var aggregatePipeline = model.aggregates[aggName];
-	console.verbose(`aggregatePipeline: ${inspect(aggregatePipeline, { depth: 8, compact: false })}\nmodel.aggregates: ${inspect(model.aggregates, {depth:8,compact:false})}`);		//  moduleName=${moduleName} modelName=${modelName} aggName=${aggName}  agg=${inspect(agg)}
-	var agg = model.aggregate(aggregatePipeline).option({allowDiskUse:true});//.stream();//cursor();
+	var aggregatePipeline = model.aggregates[aggName]();
+	var agg = model.aggregate(aggregatePipeline).option({allowDiskUse: true});
+	// agg.option({allowDiskUse: true});//.stream();//cursor();
+	console.verbose(`aggregatePipeline: ${inspect(aggregatePipeline, { depth: 8 })}\nmodel.aggregates: ${inspect(model.aggregates, {depth:8,compact:false})} agg='${inspect(agg)}' agg.option=${inspect(agg.option)}`);		//  moduleName=${moduleName} modelName=${modelName} aggName=${aggName}  agg=${inspect(agg)}
 	agg.then(data => { //cursor();//.exec();
 	// console.debug(`agg: ${inspect(agg, { depth: 2, compact: false })}`);
 	// agg.each(data => {//.exec();
@@ -159,7 +170,7 @@ app.h = express().use(function httpLogger(req, res, next) {	// dont think i need
 	})//, (cb) => { res.end(); cb(); }));
 	// agg.on('error',
 	.catch(
-	 err => app.onWarning(err, 'Aggregation error for pipeline ${moduleName}.${modelName}.{$aggName}'))
+	 err => app.onWarning(err, `Aggregation error for pipeline ${moduleName}.${modelName}.{$aggName}`))
 	/*
 	var results = [];
 	agg.each(result => results.push(result));
@@ -168,14 +179,16 @@ app.h = express().use(function httpLogger(req, res, next) {	// dont think i need
 	//agg.on('error', err => { results.push({error: err}); agg.end(); });
 	//agg.on('data', result => { results.push(result); });
 	//agg.on('end', () => { res.json(results); });
-}).use(function (err, req, res, next) {
+})
+.use(function (err, req, res, next) {
 	if (err) {
 		var msg = `Error processing HTTP ${req.method} ${req.originalUrl}`;
 		app.onWarning(err, msg);
-		res.app.app.app.status(500).send(`${msg}: ${err.stack||err}`);
+		res.status(500).send(`${msg}: ${err.stack||err}`);
 	} else {
 		console.warn*(` --##-- express error handling MW gets called with err === null`);
 	}
-}).listen(3000);
+})
+.listen(3000);
 
 module.exports = app;

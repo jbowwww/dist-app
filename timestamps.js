@@ -10,12 +10,13 @@ function Timestamps(start = true) {
 	if (!(this instanceof Timestamps)) {
 		return new Timestamps(start);
 	}
-	this.created = moment();
-	start && this.markStart();
+	var m = moment();
+	this.created = m;
+	start && this.markStart(m);
 }
 
-Timestamps.prototype.markStart = function() {
-	this.start = moment();
+Timestamps.prototype.markStart = function(mark) {
+	this.start = mark || moment();
 	this.end = {};
 }
 
