@@ -31,7 +31,9 @@ var fsStats = new mongoose.Schema({
 var	fs = _.assign(new ArtefactSchema({
 	path: { type: String, unique: true, index: true },
 	stats : fsStats,
-}, { discriminatorKey: 'type' }), {
+}, {
+	discriminatorKey: 'type'
+}), {
 	query: {
 		findByPath(path) { return this.where('path', path); },
 		older(age, currentTime = moment().utc()) { return this.where('updatedAt').lt(currentTime - age); },
@@ -129,6 +131,10 @@ var file = _.assign(new ArtefactSchema({
 		  	];
 		}
 	}
+});
+file.virtual('extension', function extension() {
+	var n = this.path.lastIndexOf('.');
+	return n < 0 ? '' : this.path.slice(n);
 });
 
 var FS = mongoose.model('fs', fs);

@@ -11,7 +11,7 @@ module.exports = ArtefactSchema;
 
 function ArtefactSchema(...args) {
 	if (!(this instanceof ArtefactSchema)) { return new ArtefactSchema(args); }
-	console.verbose(`ArtefactSchema: args=${inspect(args)}`);
+	console.debug(`ArtefactSchema: args=${inspect(args)}`);
 	mongoose.Schema.call(this, ...args);
 
 	this.add({
@@ -36,11 +36,16 @@ function ArtefactSchema(...args) {
 		!this.checkedAt && (this.checkedAt = this.updatedAt);
 		return next();
 	});
+	this.method('create', function(doc) {
+		console.debug(`${this.constructor.modelName}.create(${inspect(doc)})`);
+		doc.model.prototype.create.call(doc, doc);
+		model.emit('create', doc);
+	});
 	this.virtual('isDeleted', function() {
 		return this.deletedAt && this.deletedAt <= Date.now();
 	});
 	this.method('markDeleted', function(timestamp = Date.now()) {
-		if (this.deletedAt) { console.warn(`Doc being marked deleted already has deletedAt=${this.deletedAt.format()}`); }
+		if (this.deletedAt) { console.warn(`Doc being marked deleted already has deletedAt=${this.deletedAt}`); }
 		this.deletedAt = timestamp;
 		return Q(this);
 	});
@@ -60,7 +65,7 @@ function ArtefactSchema(...args) {
 		});
 		return Q(this);
 	});
-	this.static('findOrCreate', function  findOrCreate(query, data, cb) {
+	this.static('findOrCreate', function findOrCreate(query, data, cb) {
 		var model = this;
 		var debugPrefix = `[${typeof model} ${model.modelName}]`;
 		console.debug(`${debugPrefix}.findOrCreate: data=${inspect(data)}`);
@@ -87,9 +92,25 @@ function ArtefactSchema(...args) {
 			});
 		});
 	});
+	this.static
 	this.on('init', function onSchemaInit(_model, ...args) {
-		var debugPrefix = `model:${_model.modelName}: `;
+		var debugPrefix = `model:${_model.modelName}:`;
 		var schema = this;
+
+		var baseAggregate = _model.aggregate;
+		Object.defineProperty(_model, 'aggregate', { value: function aggregate(...args) {
+			var model = this;
+			var debugPrefix = `[${typeof model} ${model.modelName}]`;
+			console.debug(`${debugPrefix} old aggregate: ${inspect(model.aggregate)}`);
+			var agg = _.assign(baseAggregate.call(model, ...args), _.mapValues(model.schema.aggregates || {}, (aggValue, aggName) => (function (...args) {
+				this.append(model.schema.aggregates[aggName](...args));
+				return this;
+			})));
+
+			// Object.setPrototypeOf(agg, aggProto);
+			console.debug(`${debugPrefix}.aggregate(${args.map(arg=>inspect(arg)).join(', ')})}: agg=${inspect(agg, { compact: false })}`);//`\naggProto=${inspect(aggProto)}`);
+			return agg;
+		}});
 
 		Object.defineProperty(_model, 'aggregates', { value: _.bindAll(schema.aggregates || {}, _.keys(_model.aggregates)) });
 		// _model.aggregates);
@@ -242,7 +263,7 @@ function ArtefactSchema(...args) {
 			}
 		} });
 
-		console.verbose(`${debugPrefix} model='${inspect(_model)}' args=${inspect(args)}`);	// : ${inspect(_model)}`);
+		console.verbose(`${debugPrefix} model=${inspect(_model, { compact: false })}`);
 	});
 }
 

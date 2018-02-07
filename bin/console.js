@@ -21,7 +21,7 @@ var scanParameters = [
 var writers = {};
 
 app.runTask(function appMain() {
-	app.status = {
+	app.status = _.create({
 		update(current) {
 			if (!current.type) {
 				console.error(`app.status.update: current should be a fs.iterate data item with a 'type' property`);
@@ -34,8 +34,8 @@ app.runTask(function appMain() {
 			}
 		},
 		deleted(current) {
-			if (!current.type || !current.isDeleted) {
-				console.error(`app.status.update: current should be a fs.iterate data item with a 'type' property and marked deleted`);
+			if (!current.type || !current.deletedAt) { //isDeleted) {
+				console.error(`app.status.update: current should be a fs.iterate data item with a 'type' property and marked deleted : ${inspect(current, { compact: false })}`);
 			} else {
 				if (!this[current.type]) {
 					this[current.type] = { current: { path: '' }, totals: { size: 0, count: 0, deletedSize: 0, deletedCount: 0 } };
@@ -44,10 +44,10 @@ app.runTask(function appMain() {
 				this[current.type].totals.deletedSize += current.stats.size || 0;
 			}
 		}
-	};
+	});
 	console.log(`${scanParameters.length} FS scan targets: ${inspectPretty(scanParameters)}`);
 	return Q.all(scanParameters.map((scan, scanIndex) => {	//Q.Promise((resolve, reject) => {
-		console.log(`Scanning FS to depth=${scan.maxDepth} at '${scan.path}' ...`);
+		console.log(`FS scan #${scanIndex}: to depth=${scan.maxDepth} at '${scan.path}' ...`);
 		return promisifyEmitter(fs.iterate(scan.path, scan)
 		.on('error', err => app.onWarning(err, `fs.iterate error`))
 		.on('end', () => app.markPoint('fs.iterate', false))
@@ -56,15 +56,15 @@ app.runTask(function appMain() {
 			app.models.fs.fs.findOrCreate({ type: data.type, path: data.path, isDeleted: { '$ne': true } }, data)
 			.then(data => data.type === 'file' ? data.ensureCurrentHash() : data)
 			.then(data => data.save())	// doesn't seem to work if i pass cb to data.store() to use as a callback... nfi why..
-			.catch(err => app.onWarning(err, `models.${data.type} op error`))
+			.catch(err => { app.onWarning(err, `models.${data.type} op error`); })
 			.then(() => cb()).done();
-		})))
+		})), { resolveEvent: 'finish' })
 		.then(() => {
 			app.markPoint('streamFinish', true);		// maybe timestamps needs to be done in pairs (start/end TS per name) instead of all relative to a single start TS
 			console.log(`Testing unmodified FS DB entries for existence...`)
 			var deleted = {file: 0, dir: 0 };
 			var unchanged = { file: 0, dir: 0 };
-			var pathRegex = new RegExp(`^${(scan.path).replace(/\//, '\\/')}\/.*$`);
+			var pathRegex = new RegExp(`^${(scan.path).replace(/\//, '\\/')}(\\/[^\/]*){1,${scan.maxDepth === 0 ? '' : scan.maxDepth}}$`);
 			console.verbose(`DB path Regex: new RegExp( ${pathRegex.toString()} )`);
 			return promisifyEmitter(app.models.fs.fs.find({
 				path: pathRegex,
@@ -74,12 +74,13 @@ app.runTask(function appMain() {
 			.cursor().on('data', deletedFile => {
 				console.debug(`testing [${deletedFile.type}] ${deletedFile.path}`)
 				if (!fs.existsSync(deletedFile.path)) {
-					deletedFile.markDeleted().save().then(deletedFile => {
+					deletedFile.markDeleted().then(() => deletedFile.save()).then(deletedFile => {
 						app.status.deleted(deletedFile);
 						console.verbose(`DB record marked deleted: ${deletedFile.path}`);
 					}).catch(err => app.onWarning(err, `deletedFile.markDeleted error for '${deletedFile.path}'`)).done();
 				}				// 180120: Might have troubles with deletedFile.markDeleted().save() promise not having fulfilled but surrounding
-			})).then(() => {	// app.models.fs.fs.find has fulfilled, proceeding to next below lines and app/task exit
+					// app.models.fs.fs.find has fulfilled, proceeding to next below lines and app/task exit
+			})).delay(2500).then(() => {	// delay() is hack workaround because resolves on end of find() cursor, not after markDeleted() calls
 				console.log(`DB records marked deleted: deleted=${inspect(deleted)} unchanged=${inspect(unchanged)}`);
 			});
 		});
@@ -90,6 +91,6 @@ app.runTask(function appMain() {
 		console.verbose(`---- stats ---- ${prefix}\napp.models.fs.fs.stats: ${inspect(app.models.fs.fs.stats)}\n`
 		 + `app.models.fs.file.stats: ${inspect(app.models.fs.file.stats)}\n`
 		 + `app.models.fs.dir.stats: ${inspect(app.models.fs.dir.stats)}\n`
-		 + `app.status: ${inspect(app.status)}\n${app.timestamps}\n-- end stats --\n`);
+		 + `app.status: ${inspect(app.status, { depth: 3 })}\n${app.timestamps}\n-- end stats --\n`);
 	}
 });

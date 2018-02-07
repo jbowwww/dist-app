@@ -17,6 +17,7 @@ const Q = require('./q.js');
 const mongoose = require('mongoose');
 mongoose.Promise = Q.Promise;
 const express = require('express');
+const bodyParser = require('body-parser');
 const Timestamps = require('./timestamps.js');
 
 var app = {
@@ -42,12 +43,10 @@ var app = {
 			}
 		}).catch(err => this.onWarning(err));
 	},
-	exit(exitCode) {
+	exit(exitCode = 0) {
 		if (exitCode instanceof Error) {
 			 console.error(`\n\napp.exit: ${exitCode.stack||exitCode}`);
 			 exitCode = 1;
-		} else {
-			exitCode = exitCode || 0;
 		}
 		console.log(`exit: exitCode=${exitCode}`);
 		(app.db ? app.db.connection.close : process.nextTick)(() => process.exit(exitCode));
@@ -55,8 +54,7 @@ var app = {
 
 	get $init() {
 		return Q.all(this._$inits).then(() => {
-			console.verbose(`init done`);
-			console.debug(`app = ${inspect(this, { depth: 4, compact: false })}`);
+			console.debug(`$init done Q.all(this._$inits)`);
 		}).catch(err => {
 			this.exit(err);
 		})
@@ -135,11 +133,12 @@ app.h = express()
 	console.log(`HTTP ${req.method} ${req.originalUrl}`);
 	next();
 })
-.use('/', express.static(fs.path.join(__dirname, '/build')))
+.use(bodyParser.json())
+.get('/', express.static(fs.path.join(__dirname, '/build')))
 .get('/quit', function (req, res) {
 	res.send('Quit');
 	console.log('Quit via HTTP GET');
-	app._appExit.resolve();
+	app.exit();
 })
 .get('/debug', function (req, res) {
 	res.json(app.getStats());
@@ -150,15 +149,33 @@ app.h = express()
 		res.json(results);
 	}).catch(err => app.onError(err)).done();
 })
+.post('/db/:moduleName/:modelName/aggregate', function(req, res) {
+	console.debug(`req.body=(${typeof req.body}) ${inspect(req.body, { depth: 1, compact: false })}`);
+	var model = app.models[req.params.moduleName][req.params.modelName];
+	var agg = model.aggregate().option({allowDiskUse: true});
+	for (var aggCall of JSON.parse(req.body.aggregate)) {
+		console.debug(`aggCall=${inspect(aggCall)}`)
+		if (!aggCall.length || aggCall.length > 2) {
+			throw new TypeError(`aggCall = ${inspect(aggCall)}`);
+		}
+		var aggName = aggCall[0];
+		var aggArgs = aggCall[1] || [];
+		agg = agg[aggName](...aggArgs);
+	}
+	agg.then(results => {
+		res.json(results);
+	}).catch(err => app.onError(err)).done();
+})
 .get('/db/:moduleName/:modelName/:aggregate', function(req, res) {
 	var moduleName = req.params.moduleName;
 	var modelName = req.params.modelName;
 	var aggName = req.params.aggregate;
 	var model = app.models[moduleName][modelName];
-	var aggregatePipeline = model.aggregates[aggName]();
-	var agg = model.aggregate(aggregatePipeline).option({allowDiskUse: true});
+	// var aggregatePipeline = model.aggregates[aggName]();
+	var agg = model.aggregate()[aggName]().option({allowDiskUse: true});
+	// console.debug(`agg=${inspect(agg, { depth: 3, compact: false })}`);
 	// agg.option({allowDiskUse: true});//.stream();//cursor();
-	console.verbose(`aggregatePipeline: ${inspect(aggregatePipeline, { depth: 8 })}\nmodel.aggregates: ${inspect(model.aggregates, {depth:8,compact:false})} agg='${inspect(agg)}' agg.option=${inspect(agg.option)}`);		//  moduleName=${moduleName} modelName=${modelName} aggName=${aggName}  agg=${inspect(agg)}
+	// console.verbose(`aggregatePipeline: ${inspect(aggregatePipeline, { depth: 8 })}\nmodel.aggregates: ${inspect(model.aggregates, {depth:8,compact:false})} agg='${inspect(agg)}' agg.option=${inspect(agg.option)}`);		//  moduleName=${moduleName} modelName=${modelName} aggName=${aggName}  agg=${inspect(agg)}
 	agg.then(data => { //cursor();//.exec();
 	// console.debug(`agg: ${inspect(agg, { depth: 2, compact: false })}`);
 	// agg.each(data => {//.exec();
