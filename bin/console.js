@@ -15,8 +15,9 @@ const Q = require('../q.js');
 const app = require('../app.js');
 
 var scanParameters = [
-	{ path: '/mnt/wheel/Trapdoor', maxDepth: 0 },
-	{ path: '/home', maxDepth: 0 }
+	{ path: '/mnt/wheel/Trapdoor/mystuff/Moozik', maxDepth: 0 },
+	// { path: '/mnt/wheel/Trapdoor', maxDepth: 0 },
+	// { path: '/home', maxDepth: 0 }
 ];
 var writers = {};
 
@@ -62,8 +63,6 @@ app.runTask(function appMain() {
 		.then(() => {
 			app.markPoint('streamFinish', true);		// maybe timestamps needs to be done in pairs (start/end TS per name) instead of all relative to a single start TS
 			console.log(`Testing unmodified FS DB entries for existence...`)
-			var deleted = {file: 0, dir: 0 };
-			var unchanged = { file: 0, dir: 0 };
 			var pathRegex = new RegExp(`^${(scan.path).replace(/\//, '\\/')}(\\/[^\/]*){1,${scan.maxDepth === 0 ? '' : scan.maxDepth}}$`);
 			console.verbose(`DB path Regex: new RegExp( ${pathRegex.toString()} )`);
 			return promisifyEmitter(app.models.fs.fs.find({
@@ -80,9 +79,26 @@ app.runTask(function appMain() {
 					}).catch(err => app.onWarning(err, `deletedFile.markDeleted error for '${deletedFile.path}'`)).done();
 				}				// 180120: Might have troubles with deletedFile.markDeleted().save() promise not having fulfilled but surrounding
 					// app.models.fs.fs.find has fulfilled, proceeding to next below lines and app/task exit
-			})).delay(2500).then(() => {	// delay() is hack workaround because resolves on end of find() cursor, not after markDeleted() calls
-				console.log(`DB records marked deleted: deleted=${inspect(deleted)} unchanged=${inspect(unchanged)}`);
+			})).delay(2500);//.then(() => {	// delay() is hack workaround because resolves on end of find() cursor, not after markDeleted() calls
+				// console.log(`DB records marked deleted: deleted=${inspect(deleted)} unchanged=${inspect(unchanged)}`);
+			// });
+		})
+		.then(() => {
+			app.markPoint('deleteFinish', true);
+			console.log(`Scanning DB for .wav files`);
+			return app.models.fs.file.aggregate().option({allowDiskUse: true}).matchExtension('.wav')
+			.cursor({ batchSize: 20 }).exec().eachAsync(wavFile => {
+				app.models.audio.findOrCreate({fileId: wavFile._id}, { fileId: wavFile._id })
+				.then(audio => {
+					console.verbose(`audio: ${inspect(audio, { depth: 2, compact: true })}`);
+					return audio.save();
+				})
+				// .then(() => cb())
+				.catch(err => app.onWarning(err, 'audio.findOrCreate.save error')).done();
 			});
+		})
+		.then(() => {
+			app.markPoint('audioFinish', true);
 		});
 	})).then(() => { console.log(`Finished processing all paths`); app.markPoint('task'); });
 }, { //debug

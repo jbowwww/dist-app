@@ -109,6 +109,12 @@ var file = _.assign(new ArtefactSchema({
 	 * models.fs.file.aggregate.match({path: / *regex to match e.g. video extensions like mpg * /}).groupBySizeAndHash().minimumDuplicateCount(2)
 	*/
 	aggregates: {
+		match(query) {
+			return [ { $match: query } ];
+		},
+		matchExtension(extension) {
+			return [ { $match: { path: new RegExp(`^.*\.${extension}+$`) } } ];
+		},
 		groupBySizeAndHash() {
 			return [		 /* , path: /^\/mnt\/wheel\/Trapdoor\/media\/.*$/ } */
 				{ $match: { hash: { $exists : 1 }, deletedAt: { $exists: 0 }, 'stats.size': { $gt: 1024*1024 } } },

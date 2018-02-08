@@ -1,6 +1,6 @@
 "use strict";
 
-const console = require('./stdio.js').Get('artefact', { minLevel: 'log' });	// log verbose debug
+const console = require('./stdio.js').Get('artefact', { minLevel: 'verbose' });	// log verbose debug
 const inspect = require('./utility.js').makeInspect({ depth: 2, compact: true /* false */ });
 const util = require('util');
 const _ = require('lodash');

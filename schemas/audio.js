@@ -1,5 +1,5 @@
 "use strict";
-var console = require('../stdio.js').Get('modules/fs/audio', { minLevel: 'debug' });	// debug verbose
+var console = require('../stdio.js').Get('modules/audio', { minLevel: 'debug' });	// debug verbose
 const inspect =	require('../utility.js').makeInspect({ depth: 1, compact: false /* true */ });
 const baseFs = require('../fs.js');
 const _ = require('lodash');
@@ -10,12 +10,14 @@ const moment = require('moment');
 const app = require('../app.js');
 
 var audio = _.assign(new ArtefactSchema({
+    fileId: { type: mongoose.SchemaTypes.ObjectId, required: true, unique: true },
     length: { type: Number, required: true, default: 0 }
-}), {
-    methods: {
-
-    }
-});
+}));
+// , {
+//     methods: {
+//
+//     }
+// });
 var  Audio = mongoose.model('audio', audio);
 
 app.$init.then(() => {
@@ -32,4 +34,4 @@ app.$init.then(() => {
     });
 });
 
-module.exports = { audio: Audio };
+module.exports = Audio;//{ audio: Audio };

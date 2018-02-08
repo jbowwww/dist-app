@@ -1,5 +1,5 @@
 
-const console = require('./stdio.js').Get('app', { minLevel: 'verbose' });		// debug verbose log
+const console = require('./stdio.js').Get('app', { minLevel: 'debug' });		// debug verbose log
 const util = require('./util');
 const inspect =	require('./utility.js').makeInspect({ depth: 1, compact: false /* true */ });
 // const inspect2 = require('./utility.js').makeInspect({ depth: 3, compact: false });
@@ -16,6 +16,7 @@ const Collection = require('./Collection.js');
 const Q = require('./q.js');
 const mongoose = require('mongoose');
 mongoose.Promise = Q.Promise;
+const ArtefactSchema = require('./artefact-schema.js');
 const express = require('express');
 const bodyParser = require('body-parser');
 const Timestamps = require('./timestamps.js');
@@ -85,7 +86,7 @@ var app = {
 					return console.warn(`Error in module '${moduleName}': ${err.stack||err}`);
 				}
 				$hashes.push( fs.hash(file.path).then(hash => {
-					console.verbose(`Schema module '${moduleName}': hash=${hash}`);
+					console.verbose(`Schema module '${moduleName}': ${module.schema instanceof ArtefactSchema ? '' : _.keys(module).join(', ')} hash=${hash}`);
 					Object.defineProperty(module, 'hash', { value: hash });
 					this.models[moduleName] = module;
 				}));
@@ -162,6 +163,7 @@ app.h = express()
 		var aggArgs = aggCall[1] || [];
 		agg = agg[aggName](...aggArgs);
 	}
+	console.debug(`agg pipeline=${inspect(agg._pipeline, {depth: 6, compact: false})}\nagg=${inspect(agg)}`);
 	agg.then(results => {
 		res.json(results);
 	}).catch(err => app.onError(err)).done();
