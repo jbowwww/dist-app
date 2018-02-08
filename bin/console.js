@@ -1,5 +1,5 @@
 "use strict";
-const console = require('../stdio.js').Get('bin/console', { minLevel: 'debug' });	// verbose debug log
+const console = require('../stdio.js').Get('bin/console', { minLevel: 'verbose' });	// verbose debug log
 const promisifyEmitter = require('../utility.js').promisifyEmitter;
 const inspect =	require('../utility.js').makeInspect({ depth: 1, compact: true /* false */ });
 const inspectPretty = require('../utility.js').makeInspect({ depth: 2, compact: false });
@@ -15,9 +15,9 @@ const Q = require('../q.js');
 const app = require('../app.js');
 
 var scanParameters = [
-	{ path: '/mnt/wheel/Trapdoor/mystuff/Moozik', maxDepth: 0 },
-	// { path: '/mnt/wheel/Trapdoor', maxDepth: 0 },
-	// { path: '/home', maxDepth: 0 }
+	// { path: '/mnt/wheel/Trapdoor/mystuff/Moozik', maxDepth: 0 },
+	{ path: '/mnt/wheel/Trapdoor', maxDepth: 0 },
+	{ path: '/home', maxDepth: 0 }
 ];
 var writers = {};
 
