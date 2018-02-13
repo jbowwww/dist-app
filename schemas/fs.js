@@ -40,7 +40,7 @@ var	fs = _.assign(new ArtefactSchema({
 		younger(age, currentTime = Date.now()) { return this.where('deletedAt').gt(currentTime - age); }
 	}
 });
-var file = _.assign(new ArtefactSchema({
+var file = _.assign(new mongoose.Schema({
 	hash: { type: String, required: false, default: null }
 }), {
 	query: {
@@ -145,7 +145,7 @@ file.virtual('extension', function extension() {
 
 var FS = mongoose.model('fs', fs);
 var File = FS.discriminator('file', file);
-var Dir = FS.discriminator('dir', new ArtefactSchema({}));
-var Unknown = FS.discriminator('unknown', new ArtefactSchema({}));
+var Dir = FS.discriminator('dir', new mongoose.Schema({}));
+var Unknown = FS.discriminator('unknown', new mongoose.Schema({}));
 
 module.exports = { fs: FS, file: File, dir: Dir, unknown: Unknown };

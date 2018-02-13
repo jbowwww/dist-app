@@ -1,5 +1,5 @@
 "use strict";
-var console = require('../stdio.js').Get('modules/audio', { minLevel: 'debug' });	// debug verbose
+var console = require('../stdio.js').Get('modules/audio', { minLevel: 'verbose' });	// debug verbose
 const inspect =	require('../utility.js').makeInspect({ depth: 1, compact: false /* true */ });
 const baseFs = require('../fs.js');
 const _ = require('lodash');
@@ -28,7 +28,7 @@ app.$init.then(() => {
         var fileExt = doc.extension;
         if (fileExt === '.wav' || fileExt === '.mp3' || fileExt === '.au' || fileExt === '.m4a'  || fileExt === '.wma') {// && this.isModified('hash')) {
             Audio.findOrCreate({ root: this._id  }, { root: this._id, length: '1' }).then(docAudio => {
-                console.verbose(`Audio: ${docAudio.isNew ? 'created' : 'found'} ${inspect(docAudio)} for path=''${doc.path}''`);
+                console.debug(`Audio: ${docAudio.isNew ? 'created' : 'found'} ${inspect(docAudio)} for path=''${doc.path}''`);
             })
         }
     });

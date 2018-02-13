@@ -4,20 +4,25 @@ const promisifyEmitter = require('../utility.js').promisifyEmitter;
 const inspect =	require('../utility.js').makeInspect({ depth: 1, compact: true /* false */ });
 const inspectPretty = require('../utility.js').makeInspect({ depth: 2, compact: false });
 const formatSize = require('../utility.js').formatSize;
-const _ = require('lodash');
 const mixin = require('../utility.js').mixin;
 const fs = require('../fs.js');
+const Q = require('../q.js');
+const app = require('../app.js');
+const _ = require('lodash');
 const objStream = mixin(require('through2'), {
 	// spy: require('through2-spy'),
 	// filter: require('through2-filter')
 }).obj;
-const Q = require('../q.js');
-const app = require('../app.js');
+const groove = require('groove');
 
 var scanParameters = [
 	// { path: '/mnt/wheel/Trapdoor/mystuff/Moozik', maxDepth: 0 },
+	// { path: '/home', maxDepth: 2 }
+	{ path: '/home', maxDepth: 0 },
 	{ path: '/mnt/wheel/Trapdoor', maxDepth: 0 },
-	{ path: '/home', maxDepth: 0 }
+	{ path: '/media/jk/System Image/', maxDepth: 0 },
+	{ path: '/media/jk/Storage/', maxDepth: 0 }
+	// { path: '/media/jk/System Image/', maxDepth: 0 }
 ];
 var writers = {};
 
@@ -51,17 +56,17 @@ app.runTask(function appMain() {
 		console.log(`FS scan #${scanIndex}: to depth=${scan.maxDepth} at '${scan.path}' ...`);
 		return promisifyEmitter(fs.iterate(scan.path, scan)
 		.on('error', err => app.onWarning(err, `fs.iterate error`))
-		.on('end', () => app.markPoint('fs.iterate', false))
+		.on('end', () => app.markPoint(`fs.iterate#${scanIndex}`, true))
 		.pipe(objStream((data, enc, cb) => {
 			app.status.update(data);
 			app.models.fs.fs.findOrCreate({ type: data.type, path: data.path, isDeleted: { '$ne': true } }, data)
 			.then(data => data.type === 'file' ? data.ensureCurrentHash() : data)
-			.then(data => data.save())	// doesn't seem to work if i pass cb to data.store() to use as a callback... nfi why..
+			.then(data => data.bulkSave())	// doesn't seem to work if i pass cb to data.store() to use as a callback... nfi why..
 			.catch(err => { app.onWarning(err, `models.${data.type} op error`); })
 			.then(() => cb()).done();
 		})), { resolveEvent: 'finish' })
 		.then(() => {
-			app.markPoint('streamFinish', true);		// maybe timestamps needs to be done in pairs (start/end TS per name) instead of all relative to a single start TS
+			app.markPoint(`streamFinish#${scanIndex}`, true);		// maybe timestamps needs to be done in pairs (start/end TS per name) instead of all relative to a single start TS
 			console.log(`Testing unmodified FS DB entries for existence...`)
 			var pathRegex = new RegExp(`^${(scan.path).replace(/\//, '\\/')}(\\/[^\/]*){1,${scan.maxDepth === 0 ? '' : scan.maxDepth}}$`);
 			console.verbose(`DB path Regex: new RegExp( ${pathRegex.toString()} )`);
@@ -73,9 +78,9 @@ app.runTask(function appMain() {
 			.cursor().on('data', deletedFile => {
 				console.debug(`testing [${deletedFile.type}] ${deletedFile.path}`)
 				if (!fs.existsSync(deletedFile.path)) {
-					deletedFile.markDeleted().then(() => deletedFile.save()).then(deletedFile => {
+					deletedFile.markDeleted().then(() => deletedFile.bulkSave()).then(deletedFile => {
 						app.status.deleted(deletedFile);
-						console.verbose(`DB record marked deleted: ${deletedFile.path}`);
+						console.debug(`DB record marked deleted: ${deletedFile.path}`);
 					}).catch(err => app.onWarning(err, `deletedFile.markDeleted error for '${deletedFile.path}'`)).done();
 				}				// 180120: Might have troubles with deletedFile.markDeleted().save() promise not having fulfilled but surrounding
 					// app.models.fs.fs.find has fulfilled, proceeding to next below lines and app/task exit
@@ -84,25 +89,25 @@ app.runTask(function appMain() {
 			// });
 		})
 		.then(() => {
-			app.markPoint('deleteFinish', true);
+			app.markPoint(`deleteFinish#${scanIndex}`, true);
 			console.log(`Scanning DB for .wav files`);
 			return app.models.fs.file.aggregate().option({allowDiskUse: true}).matchExtension('.wav')
 			.cursor({ batchSize: 20 }).exec().eachAsync(wavFile => {
 				app.models.audio.findOrCreate({fileId: wavFile._id}, { fileId: wavFile._id })
 				.then(audio => {
-					console.verbose(`audio: ${inspect(audio, { depth: 2, compact: true })}`);
-					return audio.save();
+					console.debug(`audio: ${inspect(audio, { depth: 2, compact: true })}`);
+					return audio.bulkSave();
 				})
 				// .then(() => cb())
 				.catch(err => app.onWarning(err, 'audio.findOrCreate.save error')).done();
 			});
 		})
 		.then(() => {
-			app.markPoint('audioFinish', true);
+			app.markPoint(`audioFinish#${scanIndex}`, true);
 		});
 	})).then(() => { console.log(`Finished processing all paths`); app.markPoint('task'); });
 }, { //debug
-	interval: 40000,
+	interval: 120000,
 	fn(prefix = '') {
 		console.verbose(`---- stats ---- ${prefix}\napp.models.fs.fs.stats: ${inspect(app.models.fs.fs.stats)}\n`
 		 + `app.models.fs.file.stats: ${inspect(app.models.fs.file.stats)}\n`

@@ -22,7 +22,7 @@ function ArtefactSchema(...args) {
 	});
 	this.pre('validate', function(next) {
 		var model = this.constructor;
-		console.debug(`${model.modelName}.pre('validate'): ${inspect(this._doc)}`);
+		console.verbose(`${model.modelName}.pre('validate'): ${inspect(this._doc)}`);
 		model.stats.saved++;
 		if (!this.createdAt && !this.isNew) {
 			var e = new Error(`presave, !doc.createdAt !this.isNew ${this.isModified()?'':'!'}this.isModified()`);
@@ -36,11 +36,71 @@ function ArtefactSchema(...args) {
 		!this.checkedAt && (this.checkedAt = this.updatedAt);
 		return next();
 	});
-	this.method('create', function(doc) {
-		console.debug(`${this.constructor.modelName}.create(${inspect(doc)})`);
-		doc.model.prototype.create.call(doc, doc);
-		model.emit('create', doc);
+	this.pre('save', function(next) {
+		var model = this.constructor;
+		console.verbose(`${model.modelName}.pre('save'): ${inspect(this._doc)}`);
+		return next();
 	});
+	this.post('save', function() {
+		var model = this.constructor;
+		console.verbose(`${model.modelName}.post('save'): ${inspect(this._doc)}`);
+	});
+	this.method('bulkSave', function(maxBatchSize = 10, batchTimeout = 750) {
+		var model = this.constructor;
+		var doc = this;
+		return Q.Promise((resolve, reject, notify) => {
+			this.validate(function(error) {
+				if (error) {
+					console.warn(`${model.modelName}.bulkSave(maxBatchSize=${maxBatchSize}, batchTimeout=${batchTimeout}): validation err=${err} for doc=${inspect(doc._doc)}`);
+					model.stats.errors.push(error);
+					reject(error);
+				} else {
+					console.verbose(`${model.modelName}.bulkSave(maxBatchSize=${maxBatchSize}, batchTimeout=${batchTimeout}): valid doc=${inspect(doc._doc)}`);
+					!model._bulkSave && (model._bulkSave = []);
+					var bsOp = null;
+					if (doc.isNew) {
+						bsOp = { insertOne: { document: doc.toObject() } };
+					} else if (doc._id !== null && doc.isModified()) {
+						bsOp = { updateOne: { filter: { _id: doc.get('_id') }, update: { $set: doc } } };
+					} else {
+						console.verbose(`${model.modelName}.bulkSave unmodified doc=${inspect(doc._doc)}`);
+					}
+					if (bsOp) {
+						model._bulkSave.push(bsOp);
+						if (model._bulkSave.length >= maxBatchSize) {
+							if (model._bulkSaveTimeout) {
+								clearTimeout(model._bulkSaveTimeout);
+							}
+							innerBulkSave();
+						} else {
+							if (!model._bulkSaveTimeout) {
+								model._bulkSaveTimeout = setTimeout(innerBulkSave, batchTimeout);
+							}
+						}
+					}
+					resolve(doc);
+					function innerBulkSave() {
+						var bs = model._bulkSave;
+						model._bulkSave = [];
+						delete model._bulkSaveTimeout;
+						model.stats.bulkOps++;
+						console.verbose(`${model.modelName}.bulkSave(): bs[${bs.length}]=${inspect(bs)}`);
+						model.bulkWrite(bs)
+						.catch(err => console.warn(`${model.modelName}.bulkSave error: ${err}`))
+						.then(bulkWriteOpResult => {
+							console.verbose(`${model.modelName}.bulkSave(): bulkWriteOpResult=${inspect(bulkWriteOpResult)}`);
+						});
+					}
+				}
+			});
+		});
+
+	});
+	// this.static('create', function(doc) {
+	// 	console.verbose(`${this.modelName}.create(${inspect(doc)})`);
+	// 	return doc.model.prototype.create.call(doc, doc);
+	// 	// model.emit('create', doc);
+	// });
 	this.virtual('isDeleted', function() {
 		return this.deletedAt && this.deletedAt <= Date.now();
 	});
@@ -92,9 +152,8 @@ function ArtefactSchema(...args) {
 			});
 		});
 	});
-	this.static
 	this.on('init', function onSchemaInit(_model, ...args) {
-		var debugPrefix = `model:${_model.modelName}:`;
+		var debugPrefix = `model:${_model.modelName}`;
 		var schema = this;
 
 		var baseAggregate = _model.aggregate;
@@ -116,7 +175,8 @@ function ArtefactSchema(...args) {
 		// _model.aggregates);
 
 		Object.defineProperty(_model, 'stats', { value: {
-			saved: 0,			// number of objects stored in db
+			bulkOps: 0,			// how many bulksave operations have been done
+			saved: 0,			// number of objects stored in db using save()
 			created: 0,			// number of objects stored in db were inserted because doc.isNew == true
 			updated: 0,		// number of objects stored in db that were updated because doc.isNew == false, doc._id !== null && doc.isModified() === true
 			checked: 0,		// number of objects that were passed to doc.store() that were not new or modified, and so did not require db actions
@@ -129,7 +189,7 @@ function ArtefactSchema(...args) {
 
 		Object.defineProperty(_model, 'bulkWriter', { value: function model_bulkWriter(options) {
 			// var _model = this;
-			var debugPrefix = `[${typeof _model} ${_model.modelName}]`;
+			// var debugPrefix = `[${typeof _model} ${_model.modelName}]`;
 			options = _.assign({
 				payload: 120,
 				concurrency: 1,
@@ -263,7 +323,7 @@ function ArtefactSchema(...args) {
 			}
 		} });
 
-		console.verbose(`${debugPrefix} model=${inspect(_model, { compact: false })}`);
+		console.verbose(`${debugPrefix}  schema=this=${inspect(schema)} _model='${_model.modelName}' args=${inspect(args)}`);
 	});
 }
 
