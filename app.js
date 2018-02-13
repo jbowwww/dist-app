@@ -135,7 +135,7 @@ app.h = express()
 	next();
 })
 .use(bodyParser.json())
-.get('/', express.static(fs.path.join(__dirname, '/build')))
+.use(express.static(fs.path.join(__dirname, 'build')))
 .get('/quit', function (req, res) {
 	res.send('Quit');
 	console.log('Quit via HTTP GET');
@@ -211,3 +211,5 @@ app.h = express()
 .listen(3000);
 
 module.exports = app;
+
+console.log(`static route: '${fs.path.join(__dirname, 'build')}'`);

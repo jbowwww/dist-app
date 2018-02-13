@@ -6,8 +6,12 @@
 }
 
 .App-logo {
-  animation: App-logo-spin infinite 20s linear;
+  animation: App-logo-spin infinite 22s linear;
   height: 40px;
+}
+
+.App-logo-loading {
+  animation: App-logo-spin infinite 6s linear;
 }
 
 .App-header {
@@ -26,10 +30,9 @@
 
 .App-content {
     /*position: relative;*/
-    text-align: center;
-    /*height: 100%;*/
-    top: 0;
-    bottom: 0;
+    text-align: left;
+    padding: 10px;
+    width: 100%;
 }
 
 .App-json {

@@ -18,11 +18,14 @@ const groove = require('groove');
 var scanParameters = [
 	// { path: '/mnt/wheel/Trapdoor/mystuff/Moozik', maxDepth: 0 },
 	// { path: '/home', maxDepth: 2 }
-	{ path: '/home', maxDepth: 0 },
-	{ path: '/mnt/wheel/Trapdoor', maxDepth: 0 },
-	{ path: '/media/jk/System Image/', maxDepth: 0 },
-	{ path: '/media/jk/Storage/', maxDepth: 0 }
-	// { path: '/media/jk/System Image/', maxDepth: 0 }
+	// { path: '/home', maxDepth: 0 },
+	// { path: '/mnt/wheel/Trapdoor', maxDepth: 0 },
+	// { path: '/media/jk/System Image/', maxDepth: 0 },
+	// { path: '/media/jk/Storage/', maxDepth: 0 }
+	{ path: '/home', maxDepth: 1 },
+	{ path: '/mnt/wheel/Trapdoor', maxDepth: 1 },
+	{ path: '/media/jk/System Image/', maxDepth: 1 },
+	{ path: '/media/jk/Storage/', maxDepth: 1 }
 ];
 var writers = {};
 
