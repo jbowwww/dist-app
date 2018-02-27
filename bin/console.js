@@ -1,19 +1,39 @@
 "use strict";
 const console = require('../stdio.js').Get('bin/console', { minLevel: 'verbose' });	// verbose debug log
-const promisifyEmitter = require('../utility.js').promisifyEmitter;
+const _ = require('lodash');
+const promisifyPipeline = require('../utility.js').promisifyPipeline;
 const inspect =	require('../utility.js').makeInspect({ depth: 1, compact: true /* false */ });
 const inspectPretty = require('../utility.js').makeInspect({ depth: 2, compact: false });
 const formatSize = require('../utility.js').formatSize;
-const mixin = require('../utility.js').mixin;
+// const mixin = require('../utility.js').mixin;
 const fs = require('../fs.js');
 const Q = require('../q.js');
 const app = require('../app.js');
-const _ = require('lodash');
-const objStream = mixin(require('through2'), {
-	// spy: require('through2-spy'),
-	// filter: require('through2-filter')
-}).obj;
+const objStream = require('through2').obj;
+const doFsScan = function(scan, scanIndex, promiseTransform) {
+	console.log(`FS scan #${scanIndex}: to depth=${scan.maxDepth} at '${scan.path}' ...`);
+	return promisifyPipeline(fs.iterate(scan.path, scan)
+	.on('error', err => app.onWarning(err, `fs.iterate error`))
+	.on('end', () => app.markPoint(`fs.iterate#${scanIndex}`, true))
+	.pipe(objStream((data, enc, cb) => promiseTransform(data).then(newData => cb(null, newData)).catch(err => cb(err)))));
+};
+// const promisePipeline = function promisePipeline(promiseTransform) {
+// 	if (typeof promiseTransform !== 'function') {
+// 		throw new TypeError(`promisePipeline: promiseTransform shouuld be a function accepting stream data and returning a promise that resolves to transformed data (or null to filter data)`);
+// 	} else {
+// 		return objStream((data, enc, cb) => promiseTransform(data).then(newData => cb(null, newData)).catch(err => cb(err)));
+// 	}
+// }
+
 const groove = require('groove');
+// groove.open("danse-macabre.ogg", function(err, file) {
+//   if (err) throw err;
+//   console.log(file.metadata());
+//   console.log("duration:", file.duration());
+//   file.close(function(err) {
+//     if (err) throw err;
+//   });
+// });
 
 var scanParameters = [
 	// { path: '/mnt/wheel/Trapdoor/mystuff/Moozik', maxDepth: 0 },
@@ -32,6 +52,9 @@ var writers = {};
 app.runTask(function appMain() {
 	app.status = _.create({
 		update(current) {
+			if (typeof current !== 'object') { current = {}; }
+			current = _.defaults(current, { type: 'blank', path: 'blank' });
+			console.debug(`app.status.update( { type: '${current.type}', .., path: '${current.path}' } )`);
 			if (!current.type) {
 				console.error(`app.status.update: current should be a fs.iterate data item with a 'type' property`);
 			} else {
@@ -41,8 +64,10 @@ app.runTask(function appMain() {
 				this[current.type].totals.count++;
 				this[current.type].totals.size += current.stats.size || 0;
 			}
+			return current;
 		},
 		deleted(current) {
+			console.debug(`app.status.delete( { type: '${current.type}', .., path: '${current.path}' } )`);
 			if (!current.type || !current.deletedAt) { //isDeleted) {
 				console.error(`app.status.update: current should be a fs.iterate data item with a 'type' property and marked deleted : ${inspect(current, { compact: false })}`);
 			} else {
@@ -52,22 +77,26 @@ app.runTask(function appMain() {
 				this[current.type].totals.deletedCount++;
 				this[current.type].totals.deletedSize += current.stats.size || 0;
 			}
+			return current;
 		}
 	});
 	console.log(`${scanParameters.length} FS scan targets: ${inspectPretty(scanParameters)}`);
-	return Q.all(scanParameters.map((scan, scanIndex) => {	//Q.Promise((resolve, reject) => {
-		console.log(`FS scan #${scanIndex}: to depth=${scan.maxDepth} at '${scan.path}' ...`);
-		return promisifyEmitter(fs.iterate(scan.path, scan)
-		.on('error', err => app.onWarning(err, `fs.iterate error`))
-		.on('end', () => app.markPoint(`fs.iterate#${scanIndex}`, true))
-		.pipe(objStream((data, enc, cb) => {
-			app.status.update(data);
-			app.models.fs.fs.findOrCreate({ type: data.type, path: data.path, isDeleted: { '$ne': true } }, data)
-			.then(data => data.type === 'file' ? data.ensureCurrentHash() : data)
-			.then(data => data.bulkSave())	// doesn't seem to work if i pass cb to data.store() to use as a callback... nfi why..
+	return Q.allSettled(scanParameters.map((scan, scanIndex) =>
+		doFsScan(scan, scanIndex, data =>
+			// find old db doc for this file/dir/unknown, if it exists, or otherwise create it and return
+			// if it is a file, check and/or calculate a valid (recent & updated after file.stats.mtime - see schemas/fs.ks) hash
+			// if it is a file with a file audio file extension (see schemas/audio.js), create an audio document linked by the file's id
+			app.models.fs.fs.findOrCreate({ type: data.type, path: data.path, isDeleted: { '$ne': true } })
+			.then(data => app.status.update(data))
+			.then(data => data.type !== 'file' ? data : data.ensureCurrentHash()
+				.then(file => app.models.audio.validFileExtensions.indexOf(file.extension) < 0 ? file
+				:	Q.nfcall(groove.open, "danse-macabre.ogg")
+					.then(audio => app.models.audio.findOrCreate({ filedId: file._id }, _.assign({ fileId: file._id }, audio)))
+					.then(audio => audio.bulkSave()))
+				.then(audio => file))
+			.then(data => data.bulkSave())
 			.catch(err => { app.onWarning(err, `models.${data.type} op error`); })
-			.then(() => cb()).done();
-		})), { resolveEvent: 'finish' })
+		)
 		.then(() => {
 			app.markPoint(`streamFinish#${scanIndex}`, true);		// maybe timestamps needs to be done in pairs (start/end TS per name) instead of all relative to a single start TS
 			console.log(`Testing unmodified FS DB entries for existence...`)
@@ -94,8 +123,11 @@ app.runTask(function appMain() {
 		.then(() => {
 			app.markPoint(`deleteFinish#${scanIndex}`, true);
 			console.log(`Scanning DB for .wav files`);
-			return app.models.fs.file.aggregate().option({allowDiskUse: true}).matchExtension('.wav')
-			.cursor({ batchSize: 20 }).exec().eachAsync(wavFile => {
+			return app.models.fs.file.aggregate()
+			.option({ allowDiskUse: true })
+			.matchExtension('.wav')
+			.cursor({ batchSize: 20 })
+			.exec().eachAsync(wavFile => {
 				app.models.audio.findOrCreate({fileId: wavFile._id}, { fileId: wavFile._id })
 				.then(audio => {
 					console.debug(`audio: ${inspect(audio, { depth: 2, compact: true })}`);
@@ -107,8 +139,8 @@ app.runTask(function appMain() {
 		})
 		.then(() => {
 			app.markPoint(`audioFinish#${scanIndex}`, true);
-		});
-	})).then(() => { console.log(`Finished processing all paths`); app.markPoint('task'); });
+		})
+	)).then(() => { console.log(`Finished processing all paths`); app.markPoint('task'); });
 }, { //debug
 	interval: 120000,
 	fn(prefix = '') {

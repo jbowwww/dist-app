@@ -1,17 +1,18 @@
 
-const console = require('./stdio.js').Get('app', { minLevel: 'log' });		// debug verbose log
+const console = require('./stdio.js').Get('app', { minLevel: 'verbose' });		// debug verbose log
 const util = require('./util');
 const inspect =	require('./utility.js').makeInspect({ depth: 1, compact: false /* true */ });
 // const inspect2 = require('./utility.js').makeInspect({ depth: 3, compact: false });
-const mixin = require('./utility.js').mixin;
+// const _.mixin = require('./utility.js')._.mixin;
 const promisifyEmitter = require('./utility.js').promisifyEmitter;
 const _ = require('lodash');
 const EventEmitter = require('events');
-const objStream = mixin(require('through2'), {
-	// spy: require('through2-spy'),
-	// filter: require('through2-filter')
-}).obj;
+// const objStream = _.mixin(require('through2'), {
+// 	// spy: require('through2-spy'),
+// 	// filter: require('through2-filter')
+// }).obj;
 const fs = require('./fs.js');
+const path = require('path');
 const Collection = require('./Collection.js');
 const Q = require('./q.js');
 const mongoose = require('mongoose');
@@ -77,7 +78,7 @@ var app = {
 		return promisifyEmitter(fs.iterate(this.options.schemaPath).on('data', file => {
 			console.debug(`fs.iterate.on('data'): file.path='${file.path}'`);
 			if (file.stats.isFile() && file.path.endsWith('.js')) {
-				var module, moduleName = fs.path.basename(file.path, '.js');
+				var module, moduleName = path.basename(file.path, '.js');
 				try {
 					module = require(file.path);
 					Object.defineProperty(module, 'name', { value: moduleName });
@@ -122,7 +123,7 @@ process.on('SIGINT', () => {
 });
 
 app._init('db', mongoose.connect(app.options.db.url));
-app._init('baseHash', fs.hash(fs.path.resolve(__dirname, __filename)));
+app._init('baseHash', fs.hash(path.resolve(__dirname, __filename)));
 app._init('schemas', app.loadSchemas());
 
 function isPromise(pr) {
@@ -135,7 +136,7 @@ app.h = express()
 	next();
 })
 .use(bodyParser.json())
-.use(express.static(fs.path.join(__dirname, 'build')))
+.use(express.static(path.join(__dirname, 'build')))
 .get('/quit', function (req, res) {
 	res.send('Quit');
 	console.log('Quit via HTTP GET');
@@ -212,4 +213,4 @@ app.h = express()
 
 module.exports = app;
 
-console.log(`static route: '${fs.path.join(__dirname, 'build')}'`);
+console.log(`static route: '${path.join(__dirname, 'build')}'`);

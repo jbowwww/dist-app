@@ -4,22 +4,23 @@ const console = require('./stdio.js').Get('fs', { minLevel: 'log' });	// debug v
 // console.debug(`utility.inspect: ${typeof require('./utility.js').makeInspect}`);
 
 const	inspect = require('./utility.js').makeInspect({ depth: 2, breakLength: 0 })//()=>undefined
-,	mixin = require('./utility.js').mixin
+// ,	_.mixin = require('./utility.js')._.mixin
+, _ = require('lodash')
 , bindMethods = require('./utility.js').bindMethods
 , pipeline = require('./utility.js').pipeline
 ,	util = require('util')
-,	fs = mixin(require('fs'), {  })
+,	fs = require('fs')
+, nodePath = require('path')
 , EventEmitter = require('events')//emitter3');
 ,	stream = require('stream')
 ,	Q = require('./q.js')
 ,	promisifyEmitter = require('./utility.js').promisifyEmitter
-,	crypto = require('crypto')
-;
+,	crypto = require('crypto');
 
-module.exports = mixin(fs, {
+module.exports = _.mixin(fs, {
 	iterate
 ,	hash
-,	path: mixin(require('path'), { depth: pathDepth })
+// ,	path: _.extend(require('path'), { depth: pathDepth })
 });
 
 function pathDepth(path) {
@@ -48,10 +49,10 @@ function pathTrimTrailingSeparators(path) {
 // pipeStream (optional): a writeable stream that the fs.iterate readable stream will pipe too, except fs.iterate will still return its own readable unlike
 */
 function iterate(path, options/* , pipeStream */) {
-	path = fs.path.resolve(path);
-  options = mixin({ queueMethod: 'shift', filter: undefined, maxDepth: 1, objectMode: true, highWaterMark: 8 }, options);
+	path = nodePath.resolve(path);
+  options = _.assign({ queueMethod: 'shift', filter: undefined, maxDepth: 1, objectMode: true, highWaterMark: 8 }, options);
 	console.verbose(`iterate('${path}', ${inspect(options)})`);
-	var self = mixin({
+	var self = _.extend({
 		root: path,
 		rootDepth: pathDepth(path),
 		paths: [path],
@@ -85,7 +86,7 @@ function iterate(path, options/* , pipeStream */) {
 								if (err) return nextHandleError(err);
 								if (options.filter) names = names.filter(typeof options.filter !== 'function' ? name => name.match(options.filter): options.filter);
 								console.verbose(`${names.length} entries at depth=${currentDepth}${options.filter ? ' matching \'' + options.filter + '\'' : ''} in dir:${item.path} self.paths=[${self.paths.length}]`);
-								names.forEach(name => self.paths.push(fs.path.join(path, name)));
+								names.forEach(name => self.paths.push(nodePath.join(path, name)));
 								return self.push(item);
 							});
 						} else {

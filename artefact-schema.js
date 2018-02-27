@@ -125,6 +125,7 @@ function ArtefactSchema(...args) {
 		});
 		return Q(this);
 	});
+	this.method('')
 	this.static('findOrCreate', function findOrCreate(query, data, cb) {
 		var model = this;
 		var debugPrefix = `[${typeof model} ${model.modelName}]`;
@@ -156,11 +157,12 @@ function ArtefactSchema(...args) {
 		var debugPrefix = `model:${_model.modelName}`;
 		var schema = this;
 
+		// Fairly sure I have to assign the new aggregate function using defineProperty, pretty sure I can't override it using schema.static() etc
 		var baseAggregate = _model.aggregate;
 		Object.defineProperty(_model, 'aggregate', { value: function aggregate(...args) {
 			var model = this;
 			var debugPrefix = `[${typeof model} ${model.modelName}]`;
-			console.debug(`${debugPrefix} old aggregate: ${inspect(model.aggregate)}`);
+			console.debug(`${debugPrefix} baseAggregate=${inspect(baseAggregate)}`);
 			var agg = _.assign(baseAggregate.call(model, ...args), _.mapValues(model.schema.aggregates || {}, (aggValue, aggName) => (function (...args) {
 				this.append(model.schema.aggregates[aggName](...args));
 				return this;
@@ -171,8 +173,8 @@ function ArtefactSchema(...args) {
 			return agg;
 		}});
 
-		Object.defineProperty(_model, 'aggregates', { value: _.bindAll(schema.aggregates || {}, _.keys(_model.aggregates)) });
-		// _model.aggregates);
+		// Not needed anymore i don't think? since you bind the aggregate methods from the schema to aggregates created by model.aggregate()
+		Object.defineProperty(_model, 'aggregates', { value: _.bindAll(schema.aggregates || {}, _.keys(_model.aggregates)) });		// _model.aggregates);
 
 		Object.defineProperty(_model, 'stats', { value: {
 			bulkOps: 0,			// how many bulksave operations have been done
@@ -187,6 +189,10 @@ function ArtefactSchema(...args) {
 			// toString() { return JSON.stringify(_.assign({}, this, { errors: this.errors.length })); }		//`found: ${this.found} created: ${this.created} errors: ${this.errors.length} total: ${this.total}`; } };
 		} });
 
+		/* Not needed anymore i don't think, since the model aka document prototype now has a bulkSave() method which is simpler but may be effective.
+		 * May still want to consider making a writable stream bulkwriter iplementation available, similar to previously (below).
+		 * New bulksave() is much more concise than this was
+		 */
 		Object.defineProperty(_model, 'bulkWriter', { value: function model_bulkWriter(options) {
 			// var _model = this;
 			// var debugPrefix = `[${typeof _model} ${_model.modelName}]`;

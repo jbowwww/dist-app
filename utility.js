@@ -1,6 +1,7 @@
 
 const console = require('./stdio.js').Get('utility', { minLevel: 'log' });	// debug verbose log
 const Q = require('q');
+const _ = require('lodash');
 const EventEmitter = require('events');//eventemitter3');
 const util = require('util');
 
@@ -17,29 +18,7 @@ var makeInspect = (defaultOptions) => {
 };
 var inspect = (subject, options) => util.inspect(subject, mixin({}, _defaultInspectOptions, options));
 
-// var mainPath = require('./fs').path.dirname(require.main.filename);
-// console.verbose(`mainPath: ${mainPath}`);
-
-module.exports = {
-	// require()'s a file using a path relative to the main module's location
-	// include: function(path) {
-		// return require(fs.path.join(mainPath, path));
-	// },
-	formatSize
-,	padNumber
-,	roundNumber
-, padString
-, isEmptyString
-, isNullOrEmptyString
-,	isNullOrWhitespaceString
-, makeInspect
-,	inspect
-// ,	inspectOwn: (require('util').inspect)//inspectOwn
-,	mixin
-, pipeline
-, bindMethods
-,	promisifyEmitter
-};
+module.exports = { formatSize , padNumber , roundNumber , padString , isEmptyString , isNullOrEmptyString , isNullOrWhitespaceString , makeInspect , inspect, pipeline, promisifyEmitter, promisifyPipeline };
 
 // return a string with the supplied size in bytes, formatted as B, KB, MB, GB or TB
 function formatSize(size, options = { precision: 2, spacer: ' ' }) {
@@ -134,7 +113,7 @@ function bindMethods(target, ...sources) {
 // Also several libs available that do similar sorts of things - chaining emitters - like through2, es/event-stream (TODO: try that it looks handy), mississipi(?)
 */
 function promisifyEmitter(emitter, options) {		// 1705200429: replaced following with 'options' param(and added errorEvent) - resolveEvent = 'end', resolveTransform, errorTransform) {
-	options = mixin({ resolveEvent: 'end', errorEvent: 'error' }, options || {});		// with resolveEvent or errorEvent set to null, will disable resolve/reject
+	options = _.defaults(options || {}, { resolveEvent: 'end', errorEvent: 'error' });		// with resolveEvent or errorEvent set to null, will disable resolve/reject
 	console.debug(`promisifyEmitter: options: ${inspect(options)} emitter.on=${emitter.on}`);
 	var deferred = Q.defer();
 	var promise = deferred.promise;
@@ -158,10 +137,14 @@ function promisifyEmitter(emitter, options) {		// 1705200429: replaced following
 			// );
 		});
 	}
-	var r = mixin(emitter, promise);
+	var r = _.extend(emitter, promise);
 	console.debug(`promisifyEmitter: options: ${inspect(options)} emitter.on=${emitter.on}`);
 	console.debug(`r = ${inspect(r)}`);
 	return r;
+}
+
+function promisifyPipeline(pipeline, options) {
+	return promisifyEmitter(pipeline, { resolveEvent: 'finish' })
 }
 
 function pipeline(...transforms) {

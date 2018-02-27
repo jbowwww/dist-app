@@ -1,5 +1,5 @@
 "use strict";
-var console = require('../stdio.js').Get('modules/fs/file', { minLevel: 'log' });	// debug verbose
+var console = require('../stdio.js').Get('modules/fs/file', { minLevel: 'log' });	// debug verbose log
 const inspect =	require('../utility.js').makeInspect({ depth: 1, compact: false /* true */ });
 const baseFs = require('../fs.js');
 const _ = require('lodash');
