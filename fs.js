@@ -67,10 +67,10 @@ function iterate(path, options/* , pipeStream */) {
 					} else {
 						console.debug(`iterate('${self.root}'): stream end`);
 					}
-					process.nextTick(() => {
+					// process.nextTick(() => {
 					self.push(null);
 					// self.emit('end');
-					})
+					// })
 					;
 					return 0;
 				}
@@ -109,7 +109,7 @@ function iterate(path, options/* , pipeStream */) {
 	.on('end', (...args) => console.verbose(`iterate: end: ${inspect(args)}`))
 	.on('error', (err, ...args) => console.warn(`iterate: err: ${err.stack||err} ${inspect(args)}`))
 	var r = self;//promisifyEmitter(self, { errorEvent: null });
-	r.promisePipe = function(writeable) {  return promisifyEmitter(r.pipe(writeable), { errorEvent: null }); };
+	r.promisePipe = function(writeable) {  return promisifyEmitter(r.pipe(writeable)); };//, { errorEvent: null }
 	// r.then((...args) => { console.verbose(`iterate.then: ${inspect(args)}`); });
 	return r;
 }

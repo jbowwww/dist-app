@@ -112,26 +112,35 @@ function bindMethods(target, ...sources) {
 // 1705200425: With a little more understanding and trial and error etc the above is sort of what the 'pipeline' func below does
 // Also several libs available that do similar sorts of things - chaining emitters - like through2, es/event-stream (TODO: try that it looks handy), mississipi(?)
 */
+// 170705: Would be cool if you could optionally specify arrays of event names instead of a single string value for each - and then
+// i would probably set the default resolveEvent to be ['end', 'finish'], so it works for both reader and writer streams without needing to
+// remember to explicitly specify the correct event for one (whichever is not default)  
 function promisifyEmitter(emitter, options) {		// 1705200429: replaced following with 'options' param(and added errorEvent) - resolveEvent = 'end', resolveTransform, errorTransform) {
-	options = _.defaults(options || {}, { resolveEvent: 'end', errorEvent: 'error' });		// with resolveEvent or errorEvent set to null, will disable resolve/reject
+	options = _.defaults(options || {}, { resolveEvent: [ 'end', 'finish' ], errorEvent: 'error' });		// with resolveEvent or errorEvent set to null, will disable resolve/reject
 	console.debug(`promisifyEmitter: options: ${inspect(options)} emitter.on=${emitter.on}`);
 	var deferred = Q.defer();
 	var promise = deferred.promise;
 	if (typeof options.errorEvent === 'string') {
-		emitter.on(options.errorEvent, function(...args) {
+		options.errorEvent = [ options.errorEvent ];
+	}
+	for (var errorEvent of options.errorEvent) {
+		emitter.on(errorEvent, function(...args) {
 			if (options.errorTransform)
 				args = options.errorTransform.apply(deferred, args);
-			console.debug(`promisifyEmitter(): on '${options.errorEvent}': rejecting promise${options.errorTransform?' (via transform):':''}:${inspect(args)} this=${inspect(this)}`);
+			console.debug(`promisifyEmitter(): on '${errorEvent}': rejecting promise${options.errorTransform?' (via transform):':''}:${inspect(args)} this=${inspect(this)}`);
 			process.nextTick(() =>
 			deferred.reject(args)
 			);
 		});
 	}
 	if (typeof options.resolveEvent === 'string') {
-		emitter.on(options.resolveEvent, function(...args) {
+		options.resolveEvent = [ options.resolveEvent ];
+	}
+	for (var resolveEvent of options.resolveEvent) {
+		emitter.on(resolveEvent, function(...args) {
 			if (options.resolveTransform)
 				args = options.resolveTransform.apply(deferred, args);		//options.resolveTransform.toString()
-			console.debug(`promisifyEmitter(): on '${options.resolveEvent}': resolving promise${options.resolveTransform?' (via transform):':''}:${inspect(args)} this=${inspect(this)}`);
+			console.debug(`promisifyEmitter(): on '${resolveEvent}': resolving promise${options.resolveTransform?' (via transform):':''}:${inspect(args)} this=${inspect(this)}`);
 			// process.nextTick(() =>
 			deferred.resolve(options.resolveTransform ? options.resolveTransform(args) : args)
 			// );

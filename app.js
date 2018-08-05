@@ -36,8 +36,10 @@ var app = {
 		typeof task === 'function' && (task = { fn: task, options: { /* default task Options */ } });
 		if (!task.fn) { throw new TypeError(`runTask: expected task object with fn method`); }
 		var debugInterval = debug && debug.fn ? setInterval(debug.fn, debug.interval) : null;
-		console.verbose(`runTask: starting task function ${task.fn.name||'[AnonFunc]'}`);
-		return this.$init.then(task.fn).then(ret => {
+		console.verbose(`runTask: starting task function ${task.fn.name||'[AnonFunc]'}`); 
+		return this.$init
+		.then(() => { debug && debug.fn && debug.doImmediate && debug.fn(); })
+		.then(task.fn).then(ret => {
 			console.verbose(`runTask: task returned ${inspect(ret)}`);
 			if (debugInterval) {
 				clearInterval(debugInterval);
@@ -94,7 +96,7 @@ var app = {
 			}
 		})).then(() => Q.all($hashes));
 	},
-	markPoint(name, doStat) {
+	markPoint(name, doStat = true) {
 		this.timestamps.mark(name);
 		console.verbose(`markPoint: ${name}: ${this.timestamps.end[name]} ( duration=${this.timestamps.end[name] - this.timestamps.start} start=${this.timestamps.start} )`)
 		doStat && this._debugIntervalOptions && this._debugIntervalOptions.fn(name);
@@ -103,7 +105,7 @@ var app = {
 		return { options: app.options, timestamps: app.timestamps, errors: app.errors, warnings: app.warnings, schemas: app.schemas };
 	},
 	onWarning(err, prefix = 'Warn', cb) {
-		// console.warn(`${prefix}: ${err.stack||err}`);
+		console.warn(`${prefix}: ${err.stack||err}`);
 		this.warnings.push(err);
 		if (cb) {
 			process.nextTick(() => cb(err));

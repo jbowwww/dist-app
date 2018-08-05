@@ -22,7 +22,6 @@ function ArtefactSchema(...args) {
 	});
 	this.pre('validate', function(next) {
 		var model = this.constructor;
-		console.verbose(`${model.modelName}.pre('validate'): ${inspect(this._doc)}`);
 		model.stats.saved++;
 		if (!this.createdAt && !this.isNew) {
 			var e = new Error(`presave, !doc.createdAt !this.isNew ${this.isModified()?'':'!'}this.isModified()`);
@@ -34,6 +33,7 @@ function ArtefactSchema(...args) {
 		this[actionType + 'At']  = new Date();	// cascade current timestamp across the create,updated,checked TS's
 		!this.updatedAt && (this.updatedAt = this.createdAt);
 		!this.checkedAt && (this.checkedAt = this.updatedAt);
+		console.verbose(`${model.modelName}.pre('validate'): ${inspect(this._doc)}`);
 		return next();
 	});
 	this.pre('save', function(next) {
@@ -125,34 +125,8 @@ function ArtefactSchema(...args) {
 		});
 		return Q(this);
 	});
-	this.method('')
-	this.static('findOrCreate', function findOrCreate(query, data, cb) {
-		var model = this;
-		var debugPrefix = `[${typeof model} ${model.modelName}]`;
-		console.debug(`${debugPrefix}.findOrCreate: data=${inspect(data)}`);
-		return Q.Promise((resolve, reject, notify) => {
-			model.findOne(query, (err, r) => {
-				if (err) {
-					this.stats.errors.push(err);
-					console.warn(`${debugPrefix}.findOrCreate: findOne: ${err.stack||err}`);
-					if (cb) { process.nextTick(() => cb(err)); }
-					reject(err);
-				} else {
-					if (!r) {
-						r = _.assign(model.create(data));	//, { type: data.type }
-						this.stats.constructed++;
-						console.debug(`${debugPrefix}.findOrCreate: new data=${inspect(r)}`);
-					} else {
-						this.stats.found++;
-						console.debug(`${debugPrefix}.findOrCreate: db data=${inspect(r)}, update data=${inspect(data)}`);
-						r.updateDocument(data);			// update only doc properties that have changed
-					}
-					if (cb)	cb(null, r);
-					resolve(r);
-				}
-			});
-		});
-	});
+	// this.method('')
+	this.static('findOrCreate', function findOrCreate(query, data, cb) { return this.findOne(query).then(r => r ? r.updateDocument(data) : _.assign(this.create(data))); });
 	this.on('init', function onSchemaInit(_model, ...args) {
 		var debugPrefix = `model:${_model.modelName}`;
 		var schema = this;
@@ -184,7 +158,13 @@ function ArtefactSchema(...args) {
 			checked: 0,		// number of objects that were passed to doc.store() that were not new or modified, and so did not require db actions
 			found: 0,			// results found pre-existing in db in model.findOrCreate()
 			constructed: 0,		// results from model.findOrCreate that were constructed using new Model()
-			errors: []
+			errors: [],
+			// toString() {
+			// 	return inspect(this);
+			// },
+			// toJSON() {
+
+			// }
 			// get total() { return this.found + this.created + this.errors.length; },
 			// toString() { return JSON.stringify(_.assign({}, this, { errors: this.errors.length })); }		//`found: ${this.found} created: ${this.created} errors: ${this.errors.length} total: ${this.total}`; } };
 		} });
