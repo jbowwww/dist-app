@@ -127,7 +127,7 @@ app.runTask(function appMain() {
 	fn(prefix = '') {
 		console.verbose(`---- stats ---- ${prefix}\n`//app.models.fs.fs.stats: ${JSON.stringify(app.models.fs.fs.stats)}\n`
 		 + `app.models.fs.file.stats: ${inspect(app.models.fs.file.stats)}\n`
-		 + `app.models.fs.dir.stats: ${inspect(app.models.fs.dir.stats)}\n`
+		 + `app.models.fs.dir.stats: ${inspect (app.models.fs.dir.stats)}\n`
 		 // + `app.status: ${inspect(app.status, { depth: 3 })}\n${app.timestamps}\n-- end stats --\n`
 		);
 	}
