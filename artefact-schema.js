@@ -9,6 +9,11 @@ const mongoose = require('mongoose');
 
 module.exports = ArtefactSchema;
 
+var dataSchema = new mongoose.Schema({
+	model: { type: String, required: true },
+	dataId: { type: mongoose.SchemaTypes.ObjectId, required: true }
+});
+
 function ArtefactSchema(...args) {
 	if (!(this instanceof ArtefactSchema)) { return new ArtefactSchema(args); }
 	console.debug(`ArtefactSchema: args=${inspect(args)}`);
@@ -18,7 +23,8 @@ function ArtefactSchema(...args) {
 		createdAt: { type: Date, required: true },
 		checkedAt: { type: Date, required: false },
 		updatedAt: { type: Date, required: false },
-		deletedAt: { type: Date, required: false }
+		deletedAt: { type: Date, required: false },
+		data : [dataSchema]
 	});
 	this.pre('validate', function(next) {
 		var model = this.constructor;
@@ -130,7 +136,7 @@ function ArtefactSchema(...args) {
 	this.on('init', function onSchemaInit(_model, ...args) {
 		var debugPrefix = `model:${_model.modelName}`;
 		var schema = this;
-
+		console.verbose(`onSchemaInit():\nmodel=${inspect(_model)}\nthis=${inspect(this)}`);
 		// Fairly sure I have to assign the new aggregate function using defineProperty, pretty sure I can't override it using schema.static() etc
 		var baseAggregate = _model.aggregate;
 		Object.defineProperty(_model, 'aggregate', { value: function aggregate(...args) {

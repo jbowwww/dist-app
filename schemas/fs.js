@@ -27,10 +27,13 @@ var fsStats = new mongoose.Schema({
 	"mtimeMs" : Number,
 	"ctimeMs" : Number,
 	"birthtimeMs" : Number
-}, { _id: false});
+}, {
+	_id: false
+});
+
 var	fs = _.assign(new ArtefactSchema({
 	path: { type: String, unique: true, index: true },
-	stats : fsStats,
+	stats : fsStats
 }, {
 	discriminatorKey: 'type'
 }), {
@@ -40,6 +43,7 @@ var	fs = _.assign(new ArtefactSchema({
 		younger(age, currentTime = Date.now()) { return this.where('deletedAt').gt(currentTime - age); }
 	}
 });
+
 var file = _.assign(new mongoose.Schema({
 	hash: { type: String, required: false, default: null }
 }), {
@@ -138,7 +142,7 @@ var file = _.assign(new mongoose.Schema({
 		}
 	}
 });
-file.virtual('extension', function extension() {
+file.virtual('extension').get(function extension() {
 	var n = this.path.lastIndexOf('.');
 	return n < 0 ? '' : this.path.slice(n);
 });

@@ -1,5 +1,5 @@
 //"use strict";
-const console = require('../stdio.js').Get('bin/console', { minLevel: 'debug' });	// verbose debug log
+const console = require('../stdio.js').Get('bin/console', { minLevel: 'verbose' });	// verbose debug log
 const _ = require('lodash');
 const promisifyPipeline = require('../utility.js').promisifyPipeline;
 const inspect =	require('../utility.js').makeInspect({ depth: 1, compact: true /* false */ });
@@ -42,7 +42,7 @@ groove.open("danse-macabre.ogg", function(err, file) {
 */
 
 var scanParameters = [
-	{ path: '/home', maxDepth: 2 }
+	{ path: '/home', maxDepth: 3 }
 	// { path: '/mnt/wheel/Trapdoor/mystuff/Moozik', maxDepth: 0 },
 	// { path: '/media/jk/Storage/', maxDepth: 0 }
 	// { path: '/', maxDepth: 4 }

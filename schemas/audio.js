@@ -1,5 +1,5 @@
 "use strict";
-var console = require('../stdio.js').Get('modules/audio', { minLevel: 'debug' });	// debug verbose
+var console = require('../stdio.js').Get('modules/audio', { minLevel: 'verbose' });	// debug verbose
 const inspect =	require('../utility.js').makeInspect({ depth: 1, compact: false /* true */ });
 const baseFs = require('../fs.js');
 const _ = require('lodash');
@@ -22,11 +22,12 @@ var  Audio = mongoose.model('audio', audio);
 
 app.$init.then(() => {
     console.debug(`Audio: register watch()`);
-    app.models.fs.file.watch({ fullDocument: 'updateLookup' }).on('change', function(doc) {
+    app.models.fs.file.on('init', function (doc) { //watch(/*{ fullDocument: 'updateLookup' }*/).on('change', function(doc) {
         var model = doc.constructor;
-        console.debug(`${model.modelName}.pre('validate'): ${inspect(doc._doc)}`);
-        var fileExt = doc.extension;
+        console.debug(`${model.modelName}.on('init'): ${inspect(doc._doc)}`);
+        var fileExt = doc.extension.toLowerCase();
         if (fileExt === '.wav' || fileExt === '.mp3' || fileExt === '.au' || fileExt === '.m4a'  || fileExt === '.wma') {// && this.isModified('hash')) {
+            console.verbose(`Found audio file: ${inspect(doc._doc)}`);
             Audio.findOrCreate({ root: this._id  }, { root: this._id, length: '1' }).then(docAudio => {
                 console.debug(`Audio: ${docAudio.isNew ? 'created' : 'found'} ${inspect(docAudio)} for path=''${doc.path}''`);
             })
