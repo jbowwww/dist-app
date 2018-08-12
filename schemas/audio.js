@@ -28,8 +28,9 @@ app.$init.then(() => {
         var fileExt = doc.extension.toLowerCase();
         if (fileExt === '.wav' || fileExt === '.mp3' || fileExt === '.au' || fileExt === '.m4a'  || fileExt === '.wma') {// && this.isModified('hash')) {
             console.verbose(`Found audio file: ${inspect(doc._doc)}`);
-            Audio.findOrCreate({ root: this._id  }, { root: this._id, length: '1' }).then(docAudio => {
-                console.debug(`Audio: ${docAudio.isNew ? 'created' : 'found'} ${inspect(docAudio)} for path=''${doc.path}''`);
+            Audio.findOrCreate({ fileId: doc._doc._id  }, { fileId: doc._doc._id, length: '1' }).then(docAudio => {
+                console.verbose(`Audio: ${docAudio.isNew ? 'created' : 'found'} ${inspect(docAudio)} for path=''${doc._doc.path}''`);
+                docAudio.bulkSave();
             })
         }
     });

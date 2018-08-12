@@ -1,5 +1,5 @@
 
-const console = require('./stdio.js').Get('app', { minLevel: 'log' });		// debug verbose log
+const console = require('./stdio.js').Get('app', { minLevel: 'verbose' });		// debug verbose log
 const util = require('./util');
 const inspect =	require('./utility.js').makeInspect({ depth: 1, compact: false /* true */ });
 // const inspect2 = require('./utility.js').makeInspect({ depth: 3, compact: false });

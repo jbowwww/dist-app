@@ -95,23 +95,23 @@ app.runTask(function appMain() {
 			.delay(2500);			//.then(() => {	// delay() is hack workaround because resolves on end of find() cursor, not after markDeleted() calls
 		})
 
-		.then(() => {
-			app.markPoint(`deleteFinish for doFsScan maxDepth=${scan.maxDepth} path='${scan.path}'`, true);
-			console.log(`Scanning DB for .wav files`);
-			return app.models.fs.file.aggregate()
-			.option({ allowDiskUse: true })
-			.matchExtension('.wav')
-			.cursor({ batchSize: 20 })
-			.exec().eachAsync(wavFile => {
-				app.models.audio.findOrCreate({fileId: wavFile._id}, { fileId: wavFile._id })
-				.then(audio => {
-					console.debug(`audio: ${inspect(audio, { depth: 2, compact: true })}`);
-					return audio.bulkSave();
-				})
-				.catch(err => app.onWarning(err, 'audio.findOrCreate.save error')).done();
-			})
-			.tap(() => app.markPoint(`audioFinish for doFsScan maxDepth=${scan.maxDepth} path='${scan.path}'`, true));
-		})
+		// .then(() => {
+		// 	app.markPoint(`deleteFinish for doFsScan maxDepth=${scan.maxDepth} path='${scan.path}'`, true);
+		// 	console.log(`Scanning DB for .wav files`);
+		// 	return app.models.fs.file.aggregate()
+		// 	.option({ allowDiskUse: true })
+		// 	.matchExtension('.wav')
+		// 	.cursor({ batchSize: 20 })
+		// 	.exec().eachAsync(wavFile => {
+		// 		app.models.audio.findOrCreate({fileId: wavFile._id}, { fileId: wavFile._id })
+		// 		.then(audio => {
+		// 			console.debug(`audio: ${inspect(audio, { depth: 2, compact: true })}`);
+		// 			return audio.bulkSave();
+		// 		})
+		// 		.catch(err => app.onWarning(err, 'audio.findOrCreate.save error')).done();
+		// 	})
+		// 	.tap(() => app.markPoint(`audioFinish for doFsScan maxDepth=${scan.maxDepth} path='${scan.path}'`, true));
+		// })
 
 	))
 
@@ -128,6 +128,7 @@ app.runTask(function appMain() {
 		console.verbose(`---- stats ---- ${prefix}\n`//app.models.fs.fs.stats: ${JSON.stringify(app.models.fs.fs.stats)}\n`
 		 + `app.models.fs.file.stats: ${inspect(app.models.fs.file.stats)}\n`
 		 + `app.models.fs.dir.stats: ${inspect (app.models.fs.dir.stats)}\n`
+		 + `app.models.audio.stats: ${inspect (app.models.audio.stats)}\n`
 		 // + `app.status: ${inspect(app.status, { depth: 3 })}\n${app.timestamps}\n-- end stats --\n`
 		);
 	}
