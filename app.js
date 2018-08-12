@@ -17,7 +17,8 @@ const Collection = require('./Collection.js');
 const Q = require('./q.js');
 const mongoose = require('mongoose');
 mongoose.Promise = Q.Promise;
-const ArtefactSchema = require('./artefact-schema.js');
+const artefactSchema = require('./artefact-schema.js');
+const ArtefactDataSchema = require('./artefact-data-schema.js');
 const express = require('express');
 const bodyParser = require('body-parser');
 const Timestamps = require('./timestamps.js');
@@ -89,12 +90,17 @@ var app = {
 					return console.warn(`Error in module '${moduleName}': ${err.stack||err}`);
 				}
 				$hashes.push( fs.hash(file.path).then(hash => {
-					console.verbose(`Schema module '${moduleName}': ${module.schema instanceof ArtefactSchema ? '' : _.keys(module).join(', ')} hash=${hash}`);
+					console.verbose(`Schema module '${moduleName}': ${module.schema instanceof mongoose.Schema ? '' : _.keys(module).join(', ')} hash=${hash}`);
 					Object.defineProperty(module, 'hash', { value: hash });
 					this.models[moduleName] = module;
+					// ArtefactDataSchema(moduleName, module);
 				}));
 			}
-		})).then(() => Q.all($hashes));
+		})).then(() => Q.all($hashes)).tap(() => {
+			// The new master model / collection based on artefactSchema
+			this.artefact = mongoose.model('artefact', artefactSchema);
+			console.debug(`app = ${inspect(app, { compact: false, depth: 4 })}`);
+		});
 	},
 	markPoint(name, doStat = true) {
 		this.timestamps.mark(name);

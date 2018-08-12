@@ -4,21 +4,21 @@ const inspect =	require('../utility.js').makeInspect({ depth: 1, compact: false 
 const baseFs = require('../fs.js');
 const _ = require('lodash');
 const Q = require('q');
-const ArtefactSchema = require('../artefact-schema.js');
+const ArtefactDataSchema = require('../artefact-data-schema.js');
 const mongoose = require('mongoose');
 const moment = require('moment');
 const app = require('../app.js');
 
-var audio = _.assign(new ArtefactSchema({
-    fileId: { type: mongoose.SchemaTypes.ObjectId, required: true, unique: true },
+var audioSchema = new mongoose.Schema({
+    // fileId: { type: mongoose.SchemaTypes.ObjectId, required: true, unique: true },
     length: { type: Number, required: true, default: 0 }
-}));
+});
 // , {
 //     methods: {
 //
 //     }
 // });
-var  Audio = mongoose.model('audio', audio);
+var AudioArtefact = ArtefactDataSchema('audio', audioSchema);// mongoose.model('audio', audio);
 
 app.$init.then(() => {
     console.debug(`Audio: register watch()`);
@@ -36,4 +36,4 @@ app.$init.then(() => {
     });
 });
 
-module.exports = Audio;//{ audio: Audio };
+module.exports = AudioArtefact;//{ audio: Audio };

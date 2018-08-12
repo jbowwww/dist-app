@@ -52,12 +52,13 @@ var scanParameters = [
 app.runTask(function appMain() {
 
 	console.log(`${scanParameters.length} FS scan targets: ${inspectPretty(scanParameters)}`);
-	
+	console.debug(`app = ${inspect(app, {compact: false, depth: 3})}`);
+	console.verbose(`app.models = ${inspect(app.models, { compact: false, depth: 3})}`);
 	return Q.allSettled(scanParameters.map(scan =>
 
 		doFsScan(scan, data =>
-			app.models.fs.fs.findOrCreate({ type: data.type, path: data.path, isDeleted: { '$ne': true } }, data)
-			.then(data => data.type === 'file' ? data.ensureCurrentHash() : data)
+			app.artefact.findOrCreate(data.path, new app.models.file({ data: { stats: data.stats, fileType: data.type } }))
+			// .then(data => data.type === 'file' ? data.ensureCurrentHash() : data)
 			/*	.then(file => app.models.audio.validFileExtensions.indexOf(file.extension) < 0 ? file
 					:	Q.nfcall(groove.open, "danse-macabre.ogg")
 						.then(audio => app.models.audio.findOrCreate({ filedId: file._id }, _.assign({ fileId: file._id }, audio)))
@@ -126,9 +127,9 @@ app.runTask(function appMain() {
 	
 	fn(prefix = '') {
 		console.verbose(`---- stats ---- ${prefix}\n`//app.models.fs.fs.stats: ${JSON.stringify(app.models.fs.fs.stats)}\n`
-		 + `app.models.fs.file.stats: ${inspect(app.models.fs.file.stats)}\n`
-		 + `app.models.fs.dir.stats: ${inspect (app.models.fs.dir.stats)}\n`
-		 + `app.models.audio.stats: ${inspect (app.models.audio.stats)}\n`
+		 + `app.artefact.stats: ${inspect (app.artefact.stats)}\n`
+		 // + `app.models.fs.dir.stats: ${inspect (app.models.fs.dir.stats)}\n`
+		 // + `app.models.audio.stats: ${inspect (app.models.audio.stats)}\n`
 		 // + `app.status: ${inspect(app.status, { depth: 3 })}\n${app.timestamps}\n-- end stats --\n`
 		);
 	}
