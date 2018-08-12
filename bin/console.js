@@ -57,7 +57,7 @@ app.runTask(function appMain() {
 	return Q.allSettled(scanParameters.map(scan =>
 
 		doFsScan(scan, data =>
-			app.artefact.findOrCreate(data.path, new app.models.file({ data: { stats: data.stats, fileType: data.type } }))
+			app.artefact.findOrCreate(data.path, new app.models.file(/*{ data:*/ { stats: data.stats, fileType: data.type } /*}*/ ))
 			// .then(data => data.type === 'file' ? data.ensureCurrentHash() : data)
 			/*	.then(file => app.models.audio.validFileExtensions.indexOf(file.extension) < 0 ? file
 					:	Q.nfcall(groove.open, "danse-macabre.ogg")

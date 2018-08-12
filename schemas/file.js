@@ -138,7 +138,8 @@ fileSchema.aggregates = {
 };
 
 var FileArtefact = ArtefactDataSchema('file', fileSchema);
-
+// var create = FileArtefact.create;
+// FileArtefact.create = function(data) 
 // var FS = mongoose.model('fs', fs);
 // var File = ArtefactDataSchema('file', file);
 // var Dir = ArtefactDataSchema('dir', new mongoose.Schema({}));

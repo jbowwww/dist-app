@@ -48,7 +48,7 @@ var dataSchema = new mongoose.Schema({
 	// dataType: { type: String, required: true }
 	// _ts: timestampSchema
 }, {
-	discriminatorKey: 'dataType', _id: false
+	discriminatorKey: '_dataType', _id: false
 });
 // dataSchema.plugin(timestampSchemaPlugin);
 
