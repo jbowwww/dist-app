@@ -11,7 +11,7 @@ function timestampSchemaPlugin(schema, options) {
 
 	schema.add({
 		_ts: {
-			createdAt: { type: Date, required: true, default: Date.now },
+			createdAt: { type: Date, required: true, default: () => Date.now() },
 			checkedAt: { type: Date, required: false },
 			updatedAt: { type: Date, required: false },
 			deletedAt: { type: Date, required: false }
@@ -28,7 +28,7 @@ function timestampSchemaPlugin(schema, options) {
 		this._ts[actionType + 'At']  = new Date();	// cascade current timestamp across the create,updated,checked TS's
 		!this._ts.updatedAt && (this._ts.updatedAt = this._ts.createdAt);
 		!this._ts.checkedAt && (this._ts.checkedAt = this._ts.updatedAt);
-		console.verbose(`${model.modelName}.pre('validate')#timestampSchemaPlugin: ${inspect(this._doc)}`);
+		console.verbose(`${model.modelName}.pre('validate')#timestampSchemaPlugin: ${this.modifiedPaths().join(' ')}`);
 		return next();
 	});
 
@@ -246,7 +246,7 @@ artefactSchema.pre('validate', function(next) {
 	}
 	var actionType = this.isNew ? 'created' : this.isModified() ? 'updated' : 'checked';
 	model.stats[actionType]++;
-	console.verbose(`${model.modelName}.pre('validate'): ${inspect(this._doc)}`);
+	console.verbose(`${model.modelName}.pre('validate'): action=${actionType}: ${inspect(this._doc)}`);
 	return next();
 });
 
