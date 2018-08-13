@@ -1,6 +1,6 @@
 "use strict";
 
-const console = require('./stdio.js').Get('artefact', { minLevel: 'log' });	// log verbose debug
+const console = require('./stdio.js').Get('artefact', { minLevel: 'debug' });	// log verbose debug
 const inspect = require('./utility.js').makeInspect({ depth: 2, compact: true /* false */ });
 const util = require('util');
 const _ = require('lodash');
@@ -45,130 +45,24 @@ function timestampSchemaPlugin(schema, options) {
 }
 
 var dataSchema = new mongoose.Schema({
-	// dataType: { type: String, required: true }
-	// _ts: timestampSchema
 }, {
 	discriminatorKey: '_dataType', _id: false
 });
+// TODO: Would be nice to have timestamps per each data
+// If not the timestamp stuff may as well be defined directly in artefactSchema
 // dataSchema.plugin(timestampSchemaPlugin);
 
 var artefactSchema = new mongoose.Schema({
-	path: { type: String, unique: true, index: true, require: true },
-	// _ts: timestampSchema,
-	data: [dataSchema]
+	data: {}//mongoose.SchemaTypes.MongooseMap 	//[dataSchema]
 });
 artefactSchema.plugin(timestampSchemaPlugin);
 
-artefactSchema.query.findByPath = function(path) { return this.where('path', path); };
-
-// artefactSchema.pre('validate', function(next) {
-// 	var model = this.constructor;
-// 	model.stats.saved++;
-// 	if (!this._ts.createdAt && !this.isNew) {
-// 		var e = new Error(`${model.modelName}.pre('validate'): !doc._ts.createdAt !this.isNew ${this.isModified()?'':'!'}this.isModified()`);
-// 		model.stats.errors.push(e);
-// 		return next(e);
-// 	}
-// 	var actionType = this.isNew ? 'created' : this.isModified() ? 'updated' : 'checked';
-// 	model.stats[actionType]++;
-// 	console.verbose(`${model.modelName}.pre('validate'): ${inspect(this._doc)}`);
-// 	return next();
-// });
-
-artefactSchema.pre('save', function(next) {
-	var model = this.constructor;
-	console.verbose(`${model.modelName}.pre('save'): ${inspect(this._doc)}`);
-	return next();
-});
-artefactSchema.post('save', function() {
-	var model = this.constructor;
-	console.verbose(`${model.modelName}.post('save'): ${inspect(this._doc)}`);
-});
-artefactSchema.method('bulkSave', function(maxBatchSize = 10, batchTimeout = 750) {
-	var model = this.constructor;
-	var doc = this;
-	return Q.Promise((resolve, reject, notify) => {
-		this.validate(function(error) {
-			if (error) {
-				console.warn(`${model.modelName}.bulkSave(maxBatchSize=${maxBatchSize}, batchTimeout=${batchTimeout}): validation err=${error} for doc=${inspect(doc._doc)}`);
-				model.stats.errors.push(error);
-				reject(error);
-			} else {
-				console.verbose(`${model.modelName}.bulkSave(maxBatchSize=${maxBatchSize}, batchTimeout=${batchTimeout}): valid doc=${inspect(doc._doc)}`);
-				!model._bulkSave && (model._bulkSave = []);
-				var bsOp = null;
-				if (doc.isNew) {
-					bsOp = { insertOne: { document: doc.toObject() } };
-				} else if (doc._id !== null && doc.isModified()) {
-					bsOp = { updateOne: { filter: { _id: doc.get('_id') }, update: { $set: doc } } };
-				} else {
-					console.verbose(`${model.modelName}.bulkSave unmodified doc=${inspect(doc._doc)}`);
-				}
-				if (bsOp) {
-					model._bulkSave.push(bsOp);
-					if (model._bulkSave.length >= maxBatchSize) {
-						if (model._bulkSaveTimeout) {
-							clearTimeout(model._bulkSaveTimeout);
-						}
-						innerBulkSave();
-					} else {
-						if (!model._bulkSaveTimeout) {
-							model._bulkSaveTimeout = setTimeout(innerBulkSave, batchTimeout);
-						}
-					}
-				}
-				resolve(doc);
-				function innerBulkSave() {
-					var bs = model._bulkSave;
-					model._bulkSave = [];
-					delete model._bulkSaveTimeout;
-					model.stats.bulkOps++;
-					console.verbose(`${model.modelName}.bulkSave(): bs[${bs.length}]=${inspect(bs)}`);
-					model.bulkWrite(bs)
-					.catch(err => console.warn(`${model.modelName}.bulkSave error: ${err}`))
-					.then(bulkWriteOpResult => {
-						console.verbose(`${model.modelName}.bulkSave(): bulkWriteOpResult=${inspect(bulkWriteOpResult)}`);
-					});
-				}
-			}
-		});
-	});
-
-});
-// this.static('create', function(doc) {
-// 	console.verbose(`${this.modelName}.create(${inspect(doc)})`);
-// 	return doc.model.prototype.create.call(doc, doc);
-// 	// model.emit('create', doc);
-// });
-artefactSchema.method('updateDocument', function updateDocument(update, pathPrefix = '') {
-	_.keys(update).forEach(k => {
-		var docVal = this.get(pathPrefix + k);
-		var updVal = update[k];
-		if (this.schema.path(pathPrefix + k).instance === 'Embedded') {
-			console.debug(`updateDocument: ${pathPrefix + k}: Embedded`);
-			this.updateDocument(updVal, pathPrefix + k + '.');
-		} else if (!_.isEqual(docVal, updVal)) {
-			console.debug(`updateDocument: ${pathPrefix + k}: Updating ${docVal} to ${updVal}`);
-			this.set(pathPrefix + k, updVal);
-		} else {
-			console.debug(`updateDocument:${pathPrefix + k}: No update to ${docVal}`);
-		}
-	});
-	return Q(this);
-});
-// this.method('')
-artefactSchema.static('findOrCreate', function findOrCreate(path, data, cb) {
-	// console.debug(`artefactSchema.findOrCreate('${path}', ${inspect(data)}): this=${inspect(this)}`);
-return this.findOne({ path: path })
-	.then(r => r ? //|| /// *Q.nfbind(this, 'create')({ path: path })*/(new (this)({ path: path }))).updateDocument({ data: data }))
-		r.updateDocument({ path: path, data: data })
-	:  	_.assign(this.create({ path: path, data: data })))
-	.tap(r => console.debug(`artefactSchema.findOrCreate('${path}', ${inspect(data)}): r = ${inspect(r, { compact: false, depth: 3})}`));
-});
 artefactSchema.on('init', function onSchemaInit(_model, ...args) {
+
 	var debugPrefix = `model:${_model.modelName}`;
 	var schema = this;
 	console.verbose(`onSchemaInit():\nmodel=${inspect(_model)}\nthis=${inspect(this)}`);
+
 	// Fairly sure I have to assign the new aggregate function using defineProperty, pretty sure I can't override it using schema.static() etc
 	var baseAggregate = _model.aggregate;
 	Object.defineProperty(_model, 'aggregate', { value: function aggregate(...args) {
@@ -192,19 +86,11 @@ artefactSchema.on('init', function onSchemaInit(_model, ...args) {
 		bulkOps: 0,			// how many bulksave operations have been done
 		saved: 0,			// number of objects stored in db using save()
 		created: 0,			// number of objects stored in db were inserted because doc.isNew == true
-		updated: 0,		// number of objects stored in db that were updated because doc.isNew == false, doc._id !== null && doc.isModified() === true
-		checked: 0,		// number of objects that were passed to doc.store() that were not new or modified, and so did not require db actions
+		updated: 0,			// number of objects stored in db that were updated because doc.isNew == false, doc._id !== null && doc.isModified() === true
+		checked: 0,			// number of objects that were passed to doc.store() that were not new or modified, and so did not require db actions
 		found: 0,			// results found pre-existing in db in model.findOrCreate()
 		constructed: 0,		// results from model.findOrCreate that were constructed using new Model()
-		errors: [],
-		// toString() {
-		// 	return inspect(this);
-		// },
-		// toJSON() {
-
-		// }
-		// get total() { return this.found + this.created + this.errors.length; },
-		// toString() { return JSON.stringify(_.assign({}, this, { errors: this.errors.length })); }		//`found: ${this.found} created: ${this.created} errors: ${this.errors.length} total: ${this.total}`; } };
+		errors: []
 	} });
 
 	/* Not needed anymore i don't think, since the model aka document prototype now has a bulkSave() method which is simpler but may be effective.
@@ -350,6 +236,110 @@ artefactSchema.on('init', function onSchemaInit(_model, ...args) {
 	console.verbose(`${debugPrefix}  schema=this=${inspect(schema)} _model='${_model.modelName}' args=${inspect(args)}`);
 });
 
-// util.inherits(ArtefactSchema, mongoose.Schema);
+artefactSchema.pre('validate', function(next) {
+	var model = this.constructor;
+	model.stats.saved++;
+	if (!this._ts.createdAt && !this.isNew) {
+		var e = new Error(`${model.modelName}.pre('validate'): !doc._ts.createdAt !this.isNew ${this.isModified()?'':'!'}this.isModified()`);
+		model.stats.errors.push(e);
+		return next(e);
+	}
+	var actionType = this.isNew ? 'created' : this.isModified() ? 'updated' : 'checked';
+	model.stats[actionType]++;
+	console.verbose(`${model.modelName}.pre('validate'): ${inspect(this._doc)}`);
+	return next();
+});
+
+/*artefactSchema.pre('save', function(next) {
+	var model = this.constructor;
+	console.verbose(`${model.modelName}.pre('save'): ${inspect(this._doc)}`);
+	return next();
+});
+
+artefactSchema.post('save', function() {
+	var model = this.constructor;
+	console.verbose(`${model.modelName}.post('save'): ${inspect(this._doc)}`);
+});*/
+
+artefactSchema.method('bulkSave', function(maxBatchSize = 10, batchTimeout = 750) {
+	var model = this.constructor;
+	var doc = this;
+	return Q.Promise((resolve, reject, notify) => {
+		this.validate(function(error) {
+			if (error) {
+				console.warn(`${model.modelName}.bulkSave(maxBatchSize=${maxBatchSize}, batchTimeout=${batchTimeout}): validation err=${error} for doc=${inspect(doc._doc)}`);
+				model.stats.errors.push(error);
+				reject(error);
+			} else {
+				console.verbose(`${model.modelName}.bulkSave(maxBatchSize=${maxBatchSize}, batchTimeout=${batchTimeout}): valid doc=${inspect(doc._doc)}`);
+				!model._bulkSave && (model._bulkSave = []);
+				var bsOp = null;
+				if (doc.isNew) {
+					bsOp = { insertOne: { document: doc.toObject() } };
+				} else if (doc._id !== null && doc.isModified()) {
+					bsOp = { updateOne: { filter: { _id: doc.get('_id') }, update: { $set: doc } } };
+				} else {
+					console.verbose(`${model.modelName}.bulkSave unmodified doc=${inspect(doc._doc)}`);
+				}
+				if (bsOp) {
+					model._bulkSave.push(bsOp);
+					if (model._bulkSave.length >= maxBatchSize) {
+						if (model._bulkSaveTimeout) {
+							clearTimeout(model._bulkSaveTimeout);
+						}
+						innerBulkSave();
+					} else {
+						if (!model._bulkSaveTimeout) {
+							model._bulkSaveTimeout = setTimeout(innerBulkSave, batchTimeout);
+						}
+					}
+				}
+				resolve(doc);
+				function innerBulkSave() {
+					var bs = model._bulkSave;
+					model._bulkSave = [];
+					delete model._bulkSaveTimeout;
+					model.stats.bulkOps++;
+					console.verbose(`${model.modelName}.bulkSave(): bs[${bs.length}]=${inspect(bs)}`);
+					model.bulkWrite(bs)
+					.catch(err => console.warn(`${model.modelName}.bulkSave error: ${err}`))
+					.then(bulkWriteOpResult => {
+						console.verbose(`${model.modelName}.bulkSave(): bulkWriteOpResult=${inspect(bulkWriteOpResult)}`);
+					});
+				}
+			}
+		});
+	});
+
+});
+
+artefactSchema.method('updateDocument', function updateDocument(update, pathPrefix = '') {
+	_.keys(update).forEach(k => {
+		var docVal = this.get(pathPrefix + k);
+		var updVal = update[k];
+		if (false) {//this.schema.path(pathPrefix + k).instance === 'Embedded') {
+			console.debug(`updateDocument: ${pathPrefix + k}: Embedded`);
+			this.updateDocument(updVal, pathPrefix + k + '.');
+		} else if (!_.isEqual(docVal, updVal)) {
+			console.debug(`updateDocument: ${pathPrefix + k}: Updating ${docVal} to ${updVal}`);
+			this.set(pathPrefix + k, updVal);
+		} else {
+			console.debug(`updateDocument:${pathPrefix + k}: No update to ${docVal}`);
+		}
+	});
+	return Q(this);
+});
+
+artefactSchema.static('findOrCreate', function findOrCreate(dataTypeName, query, data, cb) {
+	// console.debug(`artefactSchema.findOrCreate('${dataTypeName}', ${inspect(query)}, ${inspect(data)}): this=${inspect(this)}`);
+	// query["data." + dataType.name] = { "$exists": 1 };
+	return this.findOne(query)//{ data: { [dataTypeName]: query } })	//path: path })
+		.then(r => r ? //|| /// *Q.nfbind(this, 'create')({ path: path })*/(new (this)({ path: path }))).updateDocument({ data: data }))
+		r.updateDocument(data, 'data.' + dataTypeName)
+	:  	/*this.create*/data)//({ data: { [dataTypeName]: data } }))
+	.tap(r => console.debug(`artefactSchema.findOrCreate(${dataTypeName}', ${inspect(query)}, ${inspect(data)}): r = ${inspect(r, { compact: false, depth: 3})}`));
+});
+
+artefactSchema.query.findByPath = function(path) { return this.where('path', path); };
 
 module.exports = artefactSchema;

@@ -84,15 +84,16 @@ var app = {
 				var module, moduleName = path.basename(file.path, '.js');
 				try {
 					module = require(file.path);
-					Object.defineProperty(module, 'name', { value: moduleName });
-					Object.defineProperty(module, 'path', { value: file.path });
+					// Object.defineProperty(module, 'name', { value: moduleName });
+					// Object.defineProperty(module, 'path', { value: file.path });
 				} catch (err) {
 					return console.warn(`Error in module '${moduleName}': ${err.stack||err}`);
 				}
 				$hashes.push( fs.hash(file.path).then(hash => {
-					console.verbose(`Schema module '${moduleName}': ${module.schema instanceof mongoose.Schema ? '' : _.keys(module).join(', ')} hash=${hash}`);
-					Object.defineProperty(module, 'hash', { value: hash });
-					this.models[moduleName] = module;
+					// console.verbose(`Schema module '${moduleName}': ${module.schema instanceof mongoose.Schema ? '' : _.keys(module).join(', ')} hash=${hash}`);
+					console.verbose(`Schema module '${moduleName}': hash=${hash}`);
+					// Object.defineProperty(module, 'hash', { value: hash });
+					this.models[moduleName] = { hash }; //module;
 					// ArtefactDataSchema(moduleName, module);
 				}));
 			}

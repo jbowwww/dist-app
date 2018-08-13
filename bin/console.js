@@ -52,12 +52,17 @@ var scanParameters = [
 app.runTask(function appMain() {
 
 	console.log(`${scanParameters.length} FS scan targets: ${inspectPretty(scanParameters)}`);
-	console.debug(`app = ${inspect(app, {compact: false, depth: 3})}`);
-	console.verbose(`app.models = ${inspect(app.models, { compact: false, depth: 3})}`);
+	console.debug(`app.models = ${inspect(app.models, { compact: false, depth: 3})}`);
 	return Q.allSettled(scanParameters.map(scan =>
 
 		doFsScan(scan, data =>
-			app.artefact.findOrCreate(data.path, new app.models.file(/*{ data:*/ { stats: data.stats, fileType: data.type } /*}*/ ))
+			app.artefact.findOrCreate("path", { "data.path.path": data.path },/* app.models.filesystem.create({ data:*/ (new (app.artefact)({
+				data: { path: {
+					path: data.path,
+					fileType: data.type,
+					stats: data.stats
+				} }
+			})))
 			// .then(data => data.type === 'file' ? data.ensureCurrentHash() : data)
 			/*	.then(file => app.models.audio.validFileExtensions.indexOf(file.extension) < 0 ? file
 					:	Q.nfcall(groove.open, "danse-macabre.ogg")
@@ -65,20 +70,23 @@ app.runTask(function appMain() {
 						.then(audio => audio.bulkSave()))
 					.then(audio => file)*/
 			.then(data => data.bulkSave())
-			.catch(err => { app.onWarning(err, `models.${data.type} op error`); }) )
+			.catch(err => { app.onWarning(err, `models.${data.type} '${data.path}' op error`); }) )
 	
 		.then(() => {
 			app.markPoint(`streamFinish for doFsScan maxDepth=${scan.maxDepth} path='${scan.path}'`, true);
 			console.log(`Testing unmodified FS DB entries for existence...`)
 			var pathRegex = new RegExp(`^${(scan.path).replace(/\//, '\\/')}(\\/[^\/]*){1,${scan.maxDepth === 0 ? '' : scan.maxDepth}}$`);
 			var query = {
-				path: pathRegex,
-				$and: [ { updatedAt: { $lte: app.timestamps.start.toISOString() } }, { checkedAt: { $lte: app.timestamps.start.toISOString() } } ],
-				isDeleted: { $ne: true }
+				path: {
+					path: pathRegex,
+					$and: [ { updatedAt: { $lte: app.timestamps.start.toISOString() } }, { checkedAt: { $lte: app.timestamps.start.toISOString() } } ],
+					isDeleted: { $ne: true }
+				}
 			};
-			console.verbose(`query: ${inspectPretty(query)}`);	//DB path Regex: new RegExp( ${pathRegex.toString()} )\napp.timestamps.start: ${app.timestamps.start} , ${app.timestamps.start.toISOString()}`);
+			console.debug(`query: ${inspectPretty(query)}`);	//DB path Regex: new RegExp( ${pathRegex.toString()} )\napp.timestamps.start: ${app.timestamps.start} , ${app.timestamps.start.toISOString()}`);
 			return promisifyEmitter(
-				app.models.fs.fs.find(query)
+				// app.models.fs.fs
+				app.artefact.find(query)
 				.cursor()
 				.on('data', deletedFile => {
 					console.debug(`testing [${deletedFile.type}] ${deletedFile.path}`)
