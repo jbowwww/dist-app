@@ -1,17 +1,22 @@
 //"use strict";
 const console = require('../stdio.js').Get('bin/console', { minLevel: 'verbose' });	// verbose debug log
 const _ = require('lodash');
-const promisifyPipeline = require('../utility.js').promisifyPipeline;
-const inspect =	require('../utility.js').makeInspect({ depth: 1, compact: true /* false */ });
-const inspectPretty = require('../utility.js').makeInspect({ depth: 4, compact: false });
-const { formatSize, promisifyEmitter } = require('../utility.js');
+const { formatSize, promisifyEmitter, makeInspect } = require('../utility.js');
+const inspect =	makeInspect({ depth: 1, compact: true });
+const inspectPretty = makeInspect({ depth: 4, compact: false });
 const fs = require('../fs.js');
 const Q = require('../q.js');
+const mongoose = require('mongoose');
 const app = require('../app.js');
-const objStream = require('through2').obj;
+const artefactSchema = require('../artefact-schema.js');
+// const artefactMakeModel = require('../artefact-model.js');
+
 const doFsScan = function(scan, promiseTransform) {
+
 	console.log(`FS scan maxDepth=${scan.maxDepth} path='${scan.path}'`);
+	
 	return Q.Promise((resolve, reject) => {
+	
 		fs.iterate(scan.path, scan).pipe(new require('stream').Writable({
 			objectMode: true,
 			write(data, encoding, callback) {
@@ -26,8 +31,9 @@ const doFsScan = function(scan, promiseTransform) {
 			app.markPoint(`doFsScan.end (maxDepth=${scan.maxDepth} path='${scan.path}')`);
 			resolve();
 		});
-	});
 	
+	});	
+
 };
 
 /* const groove = require('groove');
@@ -49,20 +55,33 @@ var scanParameters = [
 ];
 // var writers = {};
 
+
+artefactModel = mongoose.model('fs', artefactSchema
+// new mongoose.Schema({
+	// audio: require('../schemas/audio.js'),
+	// filesystem: require('../schemas/filesystem.js')
+// })
+.plugin(require('../schemas/filesystemplugin.js')));
+
+console.verbose(`artefactModel = ${inspectPretty(artefactModel)}`);
+
 app.runTask(function appMain() {
 
 	console.log(`${scanParameters.length} FS scan targets: ${inspectPretty(scanParameters)}`);
 	console.debug(`app.models = ${inspect(app.models, { compact: false, depth: 3})}`);
+
 	return Q.allSettled(scanParameters.map(scan =>
 
 		doFsScan(scan, data =>
-			app.artefact.findOrCreate("path", { "data.path.path": data.path },/* app.models.filesystem.create({ data:*/ (new (app.artefact)({
+			artefactModel.findOrCreate("file", { "file.path": data.path }, { path: data.path, fileType: data.type, stats: data.stats })
+			/* app.models.filesystem.create({ data:*/
+			/* (new (app.artefact)({
 				data: { path: {
 					path: data.path,
 					fileType: data.type,
 					stats: data.stats
 				} }
-			})))
+			})))*/
 			// .then(data => data.type === 'file' ? data.ensureCurrentHash() : data)
 			/*	.then(file => app.models.audio.validFileExtensions.indexOf(file.extension) < 0 ? file
 					:	Q.nfcall(groove.open, "danse-macabre.ogg")
@@ -127,19 +146,8 @@ app.runTask(function appMain() {
 	.tap(() => app.markPoint('Finished processing all FS scans'));
 
 }, {
-
 	// debug
 	interval: 30000,	// delay between calling the debug fn below
-	
 	doImmediate: true,	// runs the debug fn immediately on task start, without waiting for interval
-	
-	fn(prefix = '') {
-		console.verbose(`---- stats ---- ${prefix}\n`//app.models.fs.fs.stats: ${JSON.stringify(app.models.fs.fs.stats)}\n`
-		 + `app.artefact.stats: ${inspect (app.artefact.stats)}\n`
-		 // + `app.models.fs.dir.stats: ${inspect (app.models.fs.dir.stats)}\n`
-		 // + `app.models.audio.stats: ${inspect (app.models.audio.stats)}\n`
-		 // + `app.status: ${inspect(app.status, { depth: 3 })}\n${app.timestamps}\n-- end stats --\n`
-		);
-	}
-
+	fn(prefix = '') { console.verbose(`---- stats ---- ${prefix}\napp.artefact.stats: ${inspect (artefactModel.stats)}\n`); }
 });

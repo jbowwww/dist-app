@@ -1,6 +1,6 @@
 "use strict";
 
-const console = require('./stdio.js').Get('artefact', { minLevel: 'debug' });	// log verbose debug
+const console = require('./stdio.js').Get('artefact-schema', { minLevel: 'verbose' });	// log verbose debug
 const inspect = require('./utility.js').makeInspect({ depth: 2, compact: true /* false */ });
 const util = require('util');
 const _ = require('lodash');
@@ -28,7 +28,7 @@ function timestampSchemaPlugin(schema, options) {
 		this._ts[actionType + 'At']  = new Date();	// cascade current timestamp across the create,updated,checked TS's
 		!this._ts.updatedAt && (this._ts.updatedAt = this._ts.createdAt);
 		!this._ts.checkedAt && (this._ts.checkedAt = this._ts.updatedAt);
-		console.verbose(`${model.modelName}.pre('validate')#timestampSchemaPlugin: ${this.modifiedPaths().join(' ')}`);
+		// console.verbose(`${model.modelName}.pre('validate')#timestampSchemaPlugin: ${this.modifiedPaths().join(' ')}`);
 		return next();
 	});
 
@@ -53,15 +53,16 @@ var dataSchema = new mongoose.Schema({
 // dataSchema.plugin(timestampSchemaPlugin);
 
 var artefactSchema = new mongoose.Schema({
-	data: {}//mongoose.SchemaTypes.MongooseMap 	//[dataSchema]
+	// data: new mongoose.Schema({}, { _id: false })//mongoose.SchemaTypes.MongooseMap 	//[dataSchema]
 });
 artefactSchema.plugin(timestampSchemaPlugin);
+
 
 artefactSchema.on('init', function onSchemaInit(_model, ...args) {
 
 	var debugPrefix = `model:${_model.modelName}`;
 	var schema = this;
-	console.verbose(`onSchemaInit():\nmodel=${inspect(_model)}\nthis=${inspect(this)}`);
+	console.debug(`onSchemaInit():\nmodel=${inspect(_model)}\nthis=${inspect(this)} args=${inspect(args)}`);
 
 	// Fairly sure I have to assign the new aggregate function using defineProperty, pretty sure I can't override it using schema.static() etc
 	var baseAggregate = _model.aggregate;
@@ -82,7 +83,7 @@ artefactSchema.on('init', function onSchemaInit(_model, ...args) {
 	// Not needed anymore i don't think? since you bind the aggregate methods from the schema to aggregates created by model.aggregate()
 	Object.defineProperty(_model, 'aggregates', { value: _.bindAll(schema.aggregates || {}, _.keys(_model.aggregates)) });		// _model.aggregates);
 
-	Object.defineProperty(_model, 'stats', { value: {
+		Object.defineProperty(_model, 'stats', { value: {
 		bulkOps: 0,			// how many bulksave operations have been done
 		saved: 0,			// number of objects stored in db using save()
 		created: 0,			// number of objects stored in db were inserted because doc.isNew == true
@@ -233,20 +234,19 @@ artefactSchema.on('init', function onSchemaInit(_model, ...args) {
 		}
 	} });
 
-	console.verbose(`${debugPrefix}  schema=this=${inspect(schema)} _model='${_model.modelName}' args=${inspect(args)}`);
 });
 
 artefactSchema.pre('validate', function(next) {
 	var model = this.constructor;
 	model.stats.saved++;
-	if (!this._ts.createdAt && !this.isNew) {
-		var e = new Error(`${model.modelName}.pre('validate'): !doc._ts.createdAt !this.isNew ${this.isModified()?'':'!'}this.isModified()`);
-		model.stats.errors.push(e);
-		return next(e);
-	}
+	// if (!this._ts.createdAt && !this.isNew) {
+	// 	var e = new Error(`${model.modelName}.pre('validate'): !doc._ts.createdAt !this.isNew ${this.isModified()?'':'!'}this.isModified()`);
+	// 	model.stats.errors.push(e);
+	// 	return next(e);
+	// }
 	var actionType = this.isNew ? 'created' : this.isModified() ? 'updated' : 'checked';
 	model.stats[actionType]++;
-	console.verbose(`${model.modelName}.pre('validate'): action=${actionType}: ${inspect(this._doc)}`);
+	console.verbose(`${model.modelName}.pre('validate'): action=${actionType}: modified=${this.modifiedPaths().join(' ')} doc=${inspect(this._doc)}`);
 	return next();
 });
 
@@ -335,11 +335,16 @@ artefactSchema.static('findOrCreate', function findOrCreate(dataTypeName, query,
 	// query["data." + dataType.name] = { "$exists": 1 };
 	return this.findOne(query)//{ data: { [dataTypeName]: query } })	//path: path })
 		.then(r => r ? //|| /// *Q.nfbind(this, 'create')({ path: path })*/(new (this)({ path: path }))).updateDocument({ data: data }))
-		r.updateDocument(data, 'data.' + dataTypeName)
-	:  	/*this.create*/data)//({ data: { [dataTypeName]: data } }))
-	.tap(r => console.debug(`artefactSchema.findOrCreate(${dataTypeName}', ${inspect(query)}, ${inspect(data)}): r = ${inspect(r, { compact: false, depth: 3})}`));
+		r.updateDocument(data, dataTypeName)
+	:  	this.create({ [dataTypeName]: data }))//({ data: { [dataTypeName]: data } }))
+	.tap(r => console.verbose(`artefactSchema.findOrCreate(${dataTypeName}', ${inspect(query)}, ${inspect(data)}): r = ${inspect(r, { compact: false, depth: 3})}`));
 });
 
 artefactSchema.query.findByPath = function(path) { return this.where('path', path); };
+
+// artefactSchema.addDataSchema = function artefactSchema_addDataSchema(schemaName, schema) {
+// 	schema.set('_id', false);
+// 	artefactSchema.path('data').add({ schemaName: schema });
+// };
 
 module.exports = artefactSchema;

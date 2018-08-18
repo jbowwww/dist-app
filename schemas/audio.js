@@ -18,7 +18,7 @@ var audioSchema = new mongoose.Schema({
 //
 //     }
 // });
-var AudioArtefact = ArtefactDataSchema('audio', audioSchema);// mongoose.model('audio', audio);
+// var AudioArtefact = ArtefactDataSchema('audio', audioSchema);// mongoose.model('audio', audio);
 
 app.$init.then(() => {
     console.debug(`Audio: register watch()`);
@@ -36,4 +36,4 @@ app.$init.then(() => {
     });
 });
 
-module.exports = AudioArtefact;//{ audio: Audio };
+module.exports = audioSchema;// AudioArtefact;//{ audio: Audio };

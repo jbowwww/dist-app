@@ -1,9 +1,10 @@
+const console = require('./stdio.js').Get('artefact-data-schema', { minLevel: 'debug' });	// log verbose debug
 const mongoose = require('mongoose');
 const inspect =	require('./utility.js').makeInspect({ depth: 2, compact: false /* true */ });
 var artefactSchema = require('./artefact-schema.js');
 
 var dataArray = artefactSchema.path('data');
-console.log(`artefact-data-schema.js: dataArray: ${inspect(dataArray)}`);
+// console.log(`artefact-data-schema.js: dataArray: ${inspect(dataArray)}`);
 module.exports = function ArtefactDataSchema(schemaName, schema) {
 	// new mongoose.Schema({
 	// dataType: { type: String, required: true },

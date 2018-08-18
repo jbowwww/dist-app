@@ -1,6 +1,6 @@
 "use strict";
-var console = require('../stdio.js').Get('modules/fs/file', { minLevel: 'verbose' });	// debug verbose log
-const inspect =	require('../utility.js').makeInspect({ depth: 3, compact: false /* true */ });
+var console = require('../stdio.js').Get('modules/fs/file', { minLevel: 'debug' });	// debug verbose log
+const inspect =	require('../utility.js').makeInspect({ depth: 1, compact: false /* true */ });
 const baseFs = require('../fs.js');
 const _ = require('lodash');
 const Q = require('q');
@@ -31,34 +31,28 @@ var fsStatsSchema = new mongoose.Schema({
 	_id: false
 });
 
-// Indecisive on how best to organise FS entry types - file & dir for now, potentially block devices etc as per fs.Stats
-var pathSchema = new mongoose.Schema({
-	path: { type: String, unique: true, index: true, required: true },
-	pathType: { type: String, required: true, default: 'unknown' },		// not sure how best to handle this either - continue asetting manually for now i guess
-	stats : { type: fsStatsSchema, required: true },					// 'file', 'dir', or 'unknown' for now, although fs.Stats object provides others
-	hash: { type: String, required: true, default: undefined }			// only for pathType=='file'
+var	fileSchema = new mongoose.Schema({
+	stats : { type: fsStatsSchema, required: true },
+	fileType: { type: String, required: true, default: 'unknown' },	// 'file', 'dir', or 'unknown' for now, although fs.Stats object provides others
+	hash: { type: String, required: false, default: null }
 });
 
-// Will this be useful? Bevcause I believe virtuals cannot be used in a mongo query
-pathSchema.virtual('extension').get(function extension() {
+fileSchema.virtual('extension').get(function extension() {
 	var n = this.path.lastIndexOf('.');
 	return n < 0 ? '' : this.path.slice(n);
 });
 
-// fileSchema.query.older = function(age, currentTime = moment().utc()) { return this.where('updatedAt').lt(currentTime - age); };
-// fileSchema.query.younger = function(age, currentTime = Date.now()) { return this.where('deletedAt').gt(currentTime - age); };
-// fileSchema.query.hasHash = function() { return this.exists('hash'); };
+fileSchema.query.older = function(age, currentTime = moment().utc()) { return this.where('updatedAt').lt(currentTime - age); };
+fileSchema.query.younger = function(age, currentTime = Date.now()) { return this.where('deletedAt').gt(currentTime - age); };
+fileSchema.query.hasHash = function() { return this.exists('hash'); };
 
 /* Ensures the file doc ('this') has a hash value, and that the doc's updatedAt is more recent than the file's mtime ('stats.mtime')
  * returns: the file/this, with hash calculated
  */
-pathSchema.methods.ensureCurrentHash = function(cb) {
+fileSchema.methods.ensureCurrentHash = function(cb) {
+	var debugPrefix = `[${typeof this} ${this.constructor.name}]`;
 	var file = this;
 	var model = this.constructor;
-	var debugPrefix = `[${typeof file} ${model.name}]`;
-	if (file.pathType !== 'file') {		// ensure is an actual file and nota dir or 'unknown' or otherwise
-		console.warn(`${debugPrefix}.ensureCurrentHash() called for ${model.name} data with pathType='${file.pathType}', should only be called for files!`);
-	}
 	if (!model.stats.ensureCurrentHash) {
 		model.stats.ensureCurrentHash = { hashValid: 0, hashUpdated: 0, hashCreated: 0, errors: [], get total() { return this.hashValid + this.hashUpdated + this.hashCreated + this.errors.length; } };
 	}
@@ -113,7 +107,7 @@ pathSchema.methods.ensureCurrentHash = function(cb) {
  * a nice intuitive syntax with method chaining, like :
  * models.fs.file.aggregate.match({path: / *regex to match e.g. video extensions like mpg * /}).groupBySizeAndHash().minimumDuplicateCount(2)
 */
-pathSchema.aggregates = {
+fileSchema.aggregates = {
 	match(query) {
 		return [ { $match: query } ];
 	},
@@ -143,7 +137,12 @@ pathSchema.aggregates = {
 	}
 };
 
-// var Path = ArtefactDataSchema('path', pathSchema);
-// console.debug(`Path: ${inspect(Path)}`);
+// var FileArtefact = ArtefactDataSchema('file', fileSchema);
+// var create = FileArtefact.create;
+// FileArtefact.create = function(data) 
+// var FS = mongoose.model('fs', fs);
+// var File = ArtefactDataSchema('file', file);
+// var Dir = ArtefactDataSchema('dir', new mongoose.Schema({}));
+// var Unknown = ArtefactDataSchema('unknown', new mongoose.Schema({}));
 
-module.exports = pathSchema;// Path;	//{ fs: FS, file: File, dir: Dir, unknown: Unknown };
+module.exports = fileSchema;// FileArtefact;	//{ fs: FS, file: File, dir: Dir, unknown: Unknown };
