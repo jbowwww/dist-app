@@ -1,1 +1,0 @@
-"C:\Program Files\MongoDB\Server\3.2\bin\mongod" --dbpath=C:\Users\jk\Code\Projects\Node\dist-app\09_db

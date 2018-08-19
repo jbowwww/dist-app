@@ -9,7 +9,6 @@ const Q = require('../q.js');
 const mongoose = require('mongoose');
 const app = require('../app.js');
 const artefactSchema = require('../artefact-schema.js');
-// const artefactMakeModel = require('../artefact-model.js');
 
 const doFsScan = function(scan, promiseTransform) {
 	console.verbose(`FS scan maxDepth=${scan.maxDepth} path='${scan.path}'`);
@@ -50,7 +49,7 @@ var scanParameters = [
 ];
 
 let schemas = {
-	file: require('../schemas/filesystemplugin.js'),
+	file: require('../schemas/filesystem.js'),
 	audio: require('../schemas/audio.js')
 };
 _.forEach(_.keys(schemas), key => {
@@ -79,12 +78,11 @@ app.runTask(function appMain() {
 			artefactModel.findOrCreate("file", { "file.path": data.path }, { path: data.path, fileType: data.type, stats: data.stats })
 			.then(data =>
 				data.file.fileType !== 'file' ? data
-			 : 	data.file.ensureCurrentHash()))
+			 : 	data.file.ensureCurrentHash()
 			 	.then(data =>
 			 		schemas.audio.fileExtensions.indexOf(data.file.extension.toLowerCase()) < 0 ? data
 			 	: 	(!data.audio || data.isNew || data.isModified('file')) ?
-			 		_.assign(data, { audio: { length: 100 }}) : data
-			))
+			 		_.assign(data, { audio: { length: 100 }}) : data))
 
 			/* app.models.filesystem.create({ data:*/
 			/* (new (app.artefact)({
@@ -159,7 +157,7 @@ app.runTask(function appMain() {
 
 }, {
 	// debug
-	interval: 30000,	// delay between calling the debug fn below
+	interval: 13000,	// delay between calling the debug fn below
 	doImmediate: true,	// runs the debug fn immediately on task start, without waiting for interval
 	fn(prefix = '') { console.verbose(`---- stats ---- ${prefix}\napp.artefact.stats: ${inspect (artefactModel.stats)}\n`); }
 });

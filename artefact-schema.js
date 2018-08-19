@@ -2,6 +2,7 @@
 
 const console = require('./stdio.js').Get('artefact-schema', { minLevel: 'verbose' });	// log verbose debug
 const inspect = require('./utility.js').makeInspect({ depth: 2, compact: true /* false */ });
+const inspectPretty = require('./utility.js').makeInspect({ depth: 2, compact: false });
 const util = require('util');
 const _ = require('lodash');
 const Q = require('q');
@@ -244,10 +245,12 @@ artefactSchema.pre('validate', function(next) {
 	// 	model.stats.errors.push(e);
 	// 	return next(e);
 	// }
-	var actionType = this.isNew ? 'created' : this.isModified() ? 'updated' : 'checked';
+	// this.unmarkModified('_ts');
+	// this.unmarkModified('_ts.checkedAt');
+	var actionType = this.isNew ? 'created' : (this.isModified() && this.modifiedPaths().length > 2 /*!= [ '_ts', '_ts.checkedAt' ]*/) ? 'updated' : 'checked';
 	model.stats[actionType]++;
 	console.verbose(`${model.modelName}.pre('validate'): action=${actionType}: modified=${this.modifiedPaths().join(' ')} doc=${inspect(this._doc)}`);
-	return next();
+	next();
 });
 
 /*artefactSchema.pre('save', function(next) {
@@ -277,7 +280,7 @@ artefactSchema.method('bulkSave', function(maxBatchSize = 10, batchTimeout = 750
 				if (doc.isNew) {
 					bsOp = { insertOne: { document: doc.toObject() } };
 				} else if (doc._id !== null && doc.isModified()) {
-					bsOp = { updateOne: { filter: { _id: doc.get('_id') }, update: { $set: doc } } };
+					bsOp = { updateOne: { filter: { _id: doc.get('_id') }, update: { $set: doc } } };	// TODO: should i only be updating the modified fields? (always includes _ts and _ts.checkedAt)
 				} else {
 					console.verbose(`${model.modelName}.bulkSave unmodified doc=${inspect(doc._doc)}`);
 				}
@@ -314,10 +317,15 @@ artefactSchema.method('bulkSave', function(maxBatchSize = 10, batchTimeout = 750
 });
 
 artefactSchema.method('updateDocument', function updateDocument(update, pathPrefix = '') {
+	if (!pathPrefix.endsWith('.')) {
+		pathPrefix += '.';
+	}
 	_.keys(update).forEach(k => {
 		var docVal = this.get(pathPrefix + k);
 		var updVal = update[k];
-		if (false) {//this.schema.path(pathPrefix + k).instance === 'Embedded') {
+		var schemaType = this.schema.path(pathPrefix + k);
+		// console.debug(`this=${inspectPretty(this)}\nthis.schema=${inspectPretty(this.schema)}\npathPrefix+k=${pathPrefix+k}\nthis.schema.path('${pathPrefix+k}')=${inspectPretty(schemaType)}`);
+		if (schemaType && schemaType.instance === 'Embedded') {
 			console.debug(`updateDocument: ${pathPrefix + k}: Embedded`);
 			this.updateDocument(updVal, pathPrefix + k + '.');
 		} else if (!_.isEqual(docVal, updVal)) {

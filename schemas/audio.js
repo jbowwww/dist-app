@@ -4,7 +4,6 @@ const inspect =	require('../utility.js').makeInspect({ depth: 1, compact: false 
 const baseFs = require('../fs.js');
 const _ = require('lodash');
 const Q = require('q');
-const ArtefactDataSchema = require('../artefact-data-schema.js');
 const mongoose = require('mongoose');
 const moment = require('moment');
 const app = require('../app.js');
@@ -12,7 +11,7 @@ const app = require('../app.js');
 var audioSchema = new mongoose.Schema({
     // fileId: { type: mongoose.SchemaTypes.ObjectId, required: true, unique: true },
     length: { type: Number, required: true, default: 0 }
-});
+}, { _id: false });
 
 // , {
 //     methods: {

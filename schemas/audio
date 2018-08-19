@@ -1,9 +1,0 @@
-"use strict";
-var console = require('../stdio.js').Get('modules/fs/file', { minLevel: 'log' });	// debug verbose
-const inspect =	require('../utility.js').makeInspect({ depth: 1, compact: false /* true */ });
-const baseFs = require('../fs.js');
-const _ = require('lodash');
-const Q = require('q');
-const ArtefactSchema = require('../artefact-schema.js');
-const mongoose = require('mongoose');
-const moment = require('moment');

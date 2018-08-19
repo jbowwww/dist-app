@@ -1,24 +1,15 @@
 
 const console = require('./stdio.js').Get('app', { minLevel: 'verbose' });		// debug verbose log
-const util = require('./util');
 const inspect =	require('./utility.js').makeInspect({ depth: 1, compact: false /* true */ });
-// const inspect2 = require('./utility.js').makeInspect({ depth: 3, compact: false });
-// const _.mixin = require('./utility.js')._.mixin;
 const promisifyEmitter = require('./utility.js').promisifyEmitter;
 const _ = require('lodash');
 const EventEmitter = require('events');
-// const objStream = _.mixin(require('through2'), {
-// 	// spy: require('through2-spy'),
-// 	// filter: require('through2-filter')
-// }).obj;
 const fs = require('./fs.js');
 const path = require('path');
-const Collection = require('./Collection.js');
 const Q = require('./q.js');
 const mongoose = require('mongoose');
 mongoose.Promise = Q.Promise;
 const artefactSchema = require('./artefact-schema.js');
-const ArtefactDataSchema = require('./artefact-data-schema.js');
 const express = require('express');
 const bodyParser = require('body-parser');
 const Timestamps = require('./timestamps.js');
