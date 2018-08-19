@@ -3,7 +3,7 @@ const console = require('../stdio.js').Get('bin/console', { minLevel: 'verbose' 
 const _ = require('lodash');
 const { formatSize, promisifyEmitter, makeInspect } = require('../utility.js');
 const inspect =	makeInspect({ depth: 1, compact: true });
-const inspectPretty = makeInspect({ depth: 4, compact: false });
+const inspectPretty = makeInspect({ depth: 1, compact: false });
 const fs = require('../fs.js');
 const Q = require('../q.js');
 const mongoose = require('mongoose');
@@ -55,15 +55,25 @@ var scanParameters = [
 ];
 // var writers = {};
 
+let schemas = {
+	file: require('../schemas/filesystemplugin.js'),
+	audio: require('../schemas/audio.js')
+};
+_.forEach(_.keys(schemas), key => {
+	artefactSchema.plugin(schemas[key], { typeName: key });
+})
 
-artefactModel = mongoose.model('fs', artefactSchema
-// new mongoose.Schema({
-	// audio: require('../schemas/audio.js'),
-	// filesystem: require('../schemas/filesystem.js')
-// })
-.plugin(require('../schemas/filesystemplugin.js')));
+// artefactSchema.path('file').validate(function(v) {
+// 	console.log(`artefactSchema.path('file').validate(${inspect(v)})`);
+// 	if (v.fileType === 'file' && (!v.hash || !file.updatedAt || file.isModified('stats.mtime') || (file.updatedAt < (file.stats.mtime)))) {
+// 		return fs.hash(v.path).then(hash => v.hash = hash).then(() => v);
+// 	}
+// 	this./*$parent.*/audio = { length: 100 };
+// 	return true;
+// });
+artefactModel = mongoose.model('fs', artefactSchema);
 
-console.verbose(`artefactModel = ${inspectPretty(artefactModel)}`);
+console.verbose(`artefactModel.childSchemas = ${inspectPretty(artefactModel.schema.path('file'))}`);
 
 app.runTask(function appMain() {
 
@@ -74,6 +84,15 @@ app.runTask(function appMain() {
 
 		doFsScan(scan, data =>
 			artefactModel.findOrCreate("file", { "file.path": data.path }, { path: data.path, fileType: data.type, stats: data.stats })
+			.then(data =>
+				data.file.fileType !== 'file' ? data
+			 : 	data.file.ensureCurrentHash()           
+			 	.then(data =>
+			 		schemas.audio.fileExtensions.indexOf(data.file.extension.toLowerCase()) < 0 ? data
+			 	: 	(!data.audio || data.isNew || data.isModified('file')) ?
+			 		_.assign(data, { audio: { length: 100 }}) : data
+		)))
+
 			/* app.models.filesystem.create({ data:*/
 			/* (new (app.artefact)({
 				data: { path: {
@@ -88,8 +107,8 @@ app.runTask(function appMain() {
 						.then(audio => app.models.audio.findOrCreate({ filedId: file._id }, _.assign({ fileId: file._id }, audio)))
 						.then(audio => audio.bulkSave()))
 					.then(audio => file)*/
-			.then(data => data.bulkSave())
-			.catch(err => { app.onWarning(err, `models.${data.type} '${data.path}' op error`); }) )
+			.then(data => data.save())//bulkSave())
+			.catch(err => { app.onWarning(err, `models.${data.type} '${data.path}' op error`); })
 	
 		.then(() => {
 			app.markPoint(`streamFinish for doFsScan maxDepth=${scan.maxDepth} path='${scan.path}'`, true);
