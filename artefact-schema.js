@@ -336,7 +336,7 @@ artefactSchema.static('findOrCreate', function findOrCreate(dataTypeName, query,
 	return this.findOne(query)//{ data: { [dataTypeName]: query } })	//path: path })
 		.then(r => r ? //|| /// *Q.nfbind(this, 'create')({ path: path })*/(new (this)({ path: path }))).updateDocument({ data: data }))
 		r.updateDocument(data, dataTypeName)
-	:  	this.create({ [dataTypeName]: data }))//({ data: { [dataTypeName]: data } }))
+	:  	(new this/*this.create*/({ [dataTypeName]: data })))//({ data: { [dataTypeName]: data } }))
 	.tap(r => console.verbose(`artefactSchema.findOrCreate(${dataTypeName}', ${inspect(query)}, ${inspect(data)}): r = ${inspect(r, { compact: false, depth: 3})}`));
 });
 

@@ -51,7 +51,8 @@ let fileSchema = new mongoose.Schema({
 // Will this be useful? Bevcause I believe virtuals cannot be used in a mongo query
 fileSchema.virtual('extension').get(function extension() {
 	var n = this.path.lastIndexOf('.');
-	return n < 0 ? '' : this.path.slice(n + 1);
+	var n2 = Math.max(this.path.lastIndexOf('/'), this.path.lastIndexOf('\\'));
+	return (n < 0 || (n2 > 0 && n2 > n)) ? '' : this.path.slice(n + 1);
 });
 
 fileSchema.query.hasHash = function() { return this.exists('hash'); };
@@ -61,10 +62,10 @@ fileSchema.query.hasHash = function() { return this.exists('hash'); };
  */
 fileSchema.methods.ensureCurrentHash = function(cb) {
 	var file = this;
-	var model = this.constructor;
+	var model = this.$parent.constructor;
 	var debugPrefix = `[${typeof file} ${model.name}]`;
-	if (file.pathType !== 'file') {		// ensure is an actual file and nota dir or 'unknown' or otherwise
-		console.warn(`${debugPrefix}.ensureCurrentHash() called for ${model.name} data with pathType='${file.pathType}', should only be called for files!`);
+	if (file.fileType !== 'file') {		// ensure is an actual file and nota dir or 'unknown' or otherwise
+		console.warn(`${debugPrefix}.ensureCurrentHash() called for ${model.name} data with fileType='${file.fileType}', should only be called for files!`);
 	}
 	if (!model.stats.ensureCurrentHash) {
 		model.stats.ensureCurrentHash = { hashValid: 0, hashUpdated: 0, hashCreated: 0, errors: [], get total() { return this.hashValid + this.hashUpdated + this.hashCreated + this.errors.length; } };
@@ -92,14 +93,14 @@ fileSchema.methods.ensureCurrentHash = function(cb) {
 				else { model.stats.ensureCurrentHash.hashUpdated++; }
 				file.hash = hash;
 				console.verbose(`${debugPrefix}.ensureCurrentHash: computed file.hash=..${hash.substr(-6)}`);
-				resolve(file);
+				resolve(file.$parent);
 			})
 			.catch(err => ensureCurrentHashHandleError(err, 'hash error', reject))
 			.done();
 		} else {
 			model.stats.ensureCurrentHash.hashValid++;
 			console.verbose(`${debugPrefix}.ensureCurrentHash: current file.hash=..${file.hash.substr(-6)}, no action required`);
-			resolve(file);
+			resolve(file.$parent);
 		}
 	});
 
