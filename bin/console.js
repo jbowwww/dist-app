@@ -1,5 +1,5 @@
 //"use strict";
-const console = require('../stdio.js').Get('bin/console', { minLevel: 'verbose' });	// verbose debug log
+const console = require('../stdio.js').Get('bin/console', { minLevel: 'log' });	// verbose debug log
 const _ = require('lodash');
 const { formatSize, promisifyEmitter, makeInspect } = require('../utility.js');
 const inspect =	makeInspect({ depth: 1, compact: true });
@@ -75,14 +75,21 @@ app.runTask(function appMain() {
 	return Q.allSettled(scanParameters.map(scan =>
 
 		doFsScan(scan, data =>
-			artefactModel.findOrCreate("file", { "file.path": data.path }, { path: data.path, fileType: data.type, stats: data.stats })
+			artefactModel.findOrCreate(
+				"file",							// artefact type
+				{ "file.path": data.path },		// find query
+				{								// artefact data to update if found, or create if not
+					path: data.path,
+					fileType: data.type,
+					stats: data.stats
+				})
 			.then(data =>
-				data.file.fileType !== 'file' ? data
-			 : 	data.file.ensureCurrentHash()
+				data.file.fileType !== 'file' ? data : data.file.ensureCurrentHash()
 			 	.then(data =>
 			 		schemas.audio.fileExtensions.indexOf(data.file.extension.toLowerCase()) < 0 ? data
-			 	: 	(!data.audio || data.isNew || data.isModified('file')) ?
-			 		_.assign(data, { audio: { length: 100 }}) : data))
+			 	 : 	(!data.audio || data.isNew || data.isModified('file')) ?
+			 		_.assign(data, { audio: { length: 100 }}).audio.loadMetadata()
+			 		 : 	data))
 
 			/* app.models.filesystem.create({ data:*/
 			/* (new (app.artefact)({
@@ -133,23 +140,23 @@ app.runTask(function appMain() {
 			.delay(2500);			//.then(() => {	// delay() is hack workaround because resolves on end of find() cursor, not after markDeleted() calls
 		})
 
-		// .then(() => {
-		// 	app.markPoint(`deleteFinish for doFsScan maxDepth=${scan.maxDepth} path='${scan.path}'`, true);
-		// 	console.log(`Scanning DB for .wav files`);
-		// 	return app.models.fs.file.aggregate()
-		// 	.option({ allowDiskUse: true })
-		// 	.matchExtension('.wav')
-		// 	.cursor({ batchSize: 20 })
-		// 	.exec().eachAsync(wavFile => {
-		// 		app.models.audio.findOrCreate({fileId: wavFile._id}, { fileId: wavFile._id })
-		// 		.then(audio => {
-		// 			console.debug(`audio: ${inspect(audio, { depth: 2, compact: true })}`);
-		// 			return audio.bulkSave();
-		// 		})
-		// 		.catch(err => app.onWarning(err, 'audio.findOrCreate.save error')).done();
-		// 	})
-		// 	.tap(() => app.markPoint(`audioFinish for doFsScan maxDepth=${scan.maxDepth} path='${scan.path}'`, true));
-		// })
+		/*.then(() => {
+			app.markPoint(`deleteFinish for doFsScan maxDepth=${scan.maxDepth} path='${scan.path}'`, true);
+			console.log(`Scanning DB for .wav files`);
+			return app.models.fs.file.aggregate()
+			.option({ allowDiskUse: true })
+			.matchExtension('.wav')
+			.cursor({ batchSize: 20 })
+			.exec().eachAsync(wavFile => {
+				app.models.audio.findOrCreate({fileId: wavFile._id}, { fileId: wavFile._id })
+				.then(audio => {
+					console.debug(`audio: ${inspect(audio, { depth: 2, compact: true })}`);
+					return audio.bulkSave();
+				})
+				.catch(err => app.onWarning(err, 'audio.findOrCreate.save error')).done();
+			})
+			.tap(() => app.markPoint(`audioFinish for doFsScan maxDepth=${scan.maxDepth} path='${scan.path}'`, true));
+		})*/
 
 	))
 

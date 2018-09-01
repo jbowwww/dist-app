@@ -1,16 +1,19 @@
 "use strict";
 var console = require('../stdio.js').Get('modules/audio', { minLevel: 'verbose' });	// debug verbose
-const inspect =	require('../utility.js').makeInspect({ depth: 1, compact: false /* true */ });
+const inspect =	require('../utility.js').makeInspect({ depth: 1, compact: true });
+const inspectPretty = require('../utility.js').makeInspect({ depth: 1, compact: false /* true */ });
 const baseFs = require('../fs.js');
 const _ = require('lodash');
 const Q = require('q');
 const mongoose = require('mongoose');
 const moment = require('moment');
+const mm = require('music-metadata');
 const app = require('../app.js');
 
 var audioSchema = new mongoose.Schema({
     // fileId: { type: mongoose.SchemaTypes.ObjectId, required: true, unique: true },
-    length: { type: Number, required: true, default: 0 }
+    length: { type: Number, required: true, default: 0 },
+    metadata: {}
 }, { _id: false });
 
 // , {
@@ -35,6 +38,19 @@ var audioSchema = new mongoose.Schema({
 //         }
 //     });
 // });
+
+audioSchema.method('loadMetadata', function loadMetadata() {
+    var audio = this;
+    var artefact = this.$parent;
+    var model = this.$parent.constructor;
+    // var debugPrefix = `[${typeof audio} ${model.name}]`;
+    console.verbose(`: audio=${inspectPretty(audio)} artefact=${inspectPretty(artefact)}`);
+    return mm.parseFile(artefact.file.path).then(metadata => {
+        console.verbose(`${debugPrefix}: metadata=${inspectPretty(metadata)}`);
+        audio.metadata = metadata;
+        return artefact;
+    });
+});
 
 function audioPlugin(artefactSchema, options) {
     options = options || {};

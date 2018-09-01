@@ -1,5 +1,5 @@
 "use strict";
-var console = require('../stdio.js').Get('modules/fs/file', { minLevel: 'verbose' });	// debug verbose log
+var console = require('../stdio.js').Get('modules/fs/file', { minLevel: 'log' });	// debug verbose log
 const inspect =	require('../utility.js').makeInspect({ depth: 3, compact: false /* true */ });
 const inspectPretty =	require('../utility.js').makeInspect({ depth: 3, compact: true });
 const baseFs = require('../fs.js');
@@ -72,7 +72,7 @@ fileSchema.methods.ensureCurrentHash = function(cb) {
 	if (!model._hashQueue) {
 		model._hashQueue = {
 			push(data) {
-				return fs.hash(file.path).then((hash) => {
+				return fs.hash(file.path).then(hash => {
 					file.hash = hash;
 					console.verbose(`${debugPrefix}.ensureCurrentHash: computed file.hash=..${hash.substr(-6)}`);
 					return file;

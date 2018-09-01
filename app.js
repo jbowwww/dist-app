@@ -1,5 +1,5 @@
 
-const console = require('./stdio.js').Get('app', { minLevel: 'verbose' });		// debug verbose log
+const console = require('./stdio.js').Get('app', { minLevel: 'log' });		// debug verbose log
 const inspect =	require('./utility.js').makeInspect({ depth: 1, compact: false /* true */ });
 const promisifyEmitter = require('./utility.js').promisifyEmitter;
 const _ = require('lodash');
@@ -96,7 +96,7 @@ var app = {
 	},
 	markPoint(name, doStat = true) {
 		this.timestamps.mark(name);
-		console.verbose(`markPoint: ${name}: ${this.timestamps.end[name]} ( duration=${this.timestamps.end[name] - this.timestamps.start} start=${this.timestamps.start} )`)
+		console.log(`markPoint: ${name}: ${this.timestamps.end[name]} ( duration=${this.timestamps.end[name] - this.timestamps.start} start=${this.timestamps.start} )`)
 		doStat && this._debugIntervalOptions && this._debugIntervalOptions.fn(name);
 	},
 	getStats() {
