@@ -1,6 +1,6 @@
 "use strict";
 
-const console = require('./stdio.js').Get('artefact-schema', { minLevel: 'log' });	// log verbose debug
+const console = require('./stdio.js').Get('artefact-schema', { minLevel: 'verbose' });	// log verbose debug
 const inspect = require('./utility.js').makeInspect({ depth: 2, compact: true /* false */ });
 const inspectPretty = require('./utility.js').makeInspect({ depth: 2, compact: false });
 const util = require('util');
@@ -9,7 +9,6 @@ const Q = require('q');
 const mongoose = require('mongoose');
 
 function timestampSchemaPlugin(schema, options) {
-
 	schema.add({
 		_ts: {
 			createdAt: { type: Date, required: true, default: () => Date.now() },
@@ -42,28 +41,18 @@ function timestampSchemaPlugin(schema, options) {
 		this._ts.deletedAt = timestamp;
 		return Q(this);
 	});
-
 }
 
-var dataSchema = new mongoose.Schema({
-}, {
-	discriminatorKey: '_dataType', _id: false
-});
-// TODO: Would be nice to have timestamps per each data
-// If not the timestamp stuff may as well be defined directly in artefactSchema
-// dataSchema.plugin(timestampSchemaPlugin);
-
-var artefactSchema = new mongoose.Schema({
-	// data: new mongoose.Schema({}, { _id: false })//mongoose.SchemaTypes.MongooseMap 	//[dataSchema]
-});
+var artefactSchema = new mongoose.Schema({ });
 artefactSchema.plugin(timestampSchemaPlugin);
 
-
 artefactSchema.on('init', function onSchemaInit(_model, ...args) {
-
 	var debugPrefix = `model:${_model.modelName}`;
 	var schema = this;
-	console.debug(`onSchemaInit():\nmodel=${inspect(_model)}\nthis=${inspect(this)} args=${inspect(args)}`);
+
+	Object.defineProperty(_model, 'artefactTypes', { value: _.fromPairs(_.keys(schema.paths).filter(key => key[0] !== '_').map(key => [ key, {
+		findOrCreate(query, data, cb) { return _model.findOrCreate(key, query, data, cb); }
+	} ])) });
 
 	// Fairly sure I have to assign the new aggregate function using defineProperty, pretty sure I can't override it using schema.static() etc
 	var baseAggregate = _model.aggregate;
@@ -81,10 +70,7 @@ artefactSchema.on('init', function onSchemaInit(_model, ...args) {
 		return agg;
 	}});
 
-	// Not needed anymore i don't think? since you bind the aggregate methods from the schema to aggregates created by model.aggregate()
-	Object.defineProperty(_model, 'aggregates', { value: _.bindAll(schema.aggregates || {}, _.keys(_model.aggregates)) });		// _model.aggregates);
-
-		Object.defineProperty(_model, 'stats', { value: {
+	Object.defineProperty(_model, 'stats', { value: {
 		bulkOps: 0,			// how many bulksave operations have been done
 		saved: 0,			// number of objects stored in db using save()
 		created: 0,			// number of objects stored in db were inserted because doc.isNew == true
@@ -94,175 +80,16 @@ artefactSchema.on('init', function onSchemaInit(_model, ...args) {
 		constructed: 0,		// results from model.findOrCreate that were constructed using new Model()
 		errors: []
 	} });
-
-	/* Not needed anymore i don't think, since the model aka document prototype now has a bulkSave() method which is simpler but may be effective.
-	 * May still want to consider making a writable stream bulkwriter iplementation available, similar to previously (below).
-	 * New bulksave() is much more concise than this was
-	 */
-	Object.defineProperty(_model, 'bulkWriter', { value: function model_bulkWriter(options) {
-		// var _model = this;
-		// var debugPrefix = `[${typeof _model} ${_model.modelName}]`;
-		options = _.assign({
-			payload: 120,
-			concurrency: 1,
-			BulkWriteTimeout: 3500,
-			asyncTimeResolution: 3800,
-			writeStreamFlushTimeout: 5000,
-			getWriteOp(data) { return { insertOne: { document: data } }; },
-			debugInterval: 8800
-		}, options);
-		console.verbose(`${debugPrefix}.bulkWriter(${inspect(options)}) getWriteOp=${options.getWriteOp}`);
-
-		var self = _.assign(new cargo(bulkWrite, options.payload, options), {
-			options, status: 'idle', finishing: false, finished: false, ended: false,
-			_writes: 0, _writesDone: 0, _writesFail: 0, _ops: 0, _opsDone: 0, _opsFail: 0, _errors: [],
-			_endDefer: Q.defer(),
-
-			_debug(prefix = '', suffix = '') {
-				console.verbose(self._getDebug(prefix, suffix));
-			},
-			_getDebug(prefix = '', suffix = '') {
-				return `${debugPrefix}.bulkWriter: ${prefix}status=${self.status} writes=${self._writes} writesDone=${self._writesDone} writesFail=${self._writesFail} ops=${self._ops} opsDone=${self._opsDone} opsFail=${self._opsFail} ${suffix}`;
-			},
-			_debugInterval(interval = 10000) {
-				// var delta = self.stats.delta(self.lastStats);
-				self._debug();//`elapsed=${delta.elapsedSeconds}s`);//, `delta/s=${inspect(delta)}`);
-				if (!self.finished && interval !== 0)
-					Q.interval(interval, () => self._debugInterval(interval));
-			},
-
-			asStream() {
-				var stream = _.assign(new Writable({
-					objectMode: true,
-					write(data, enc, cb) {
-						self._writes++;
-						self.push(data);
-						cb();
-					},
-					final(cb) {
-						self.finishing = true;
-						self.status = 'finishing';
-						self._debug(`flush #1`);
-						self._spawnWorkers();
-						if (self._queue.length === 0) {
-							self.finished = self.ended = true;
-							self.status = 'ended';
-							self._debug(`self._queue.length === 0, finishing immediately`);
-							process.nextTick(() => {
-								self._endDefer.resolve();
-								cb();
-							})
-						} else {
-							self.once('empty', () => {
-								self.finished = true;
-								self.status = 'finished';
-								self._debug(`flush #2`);
-							});
-							self.once('drain', () => {
-								self.ended = true;
-								self.status = 'ended';
-								self._debug(`Last drain event, emitting end`);
-								process.nextTick(() => {
-									self._endDefer.resolve();
-								cb();
-								});
-							});
-						}
-					}
-				}), {
-					waitFinishWrite() {
-						return self._endDefer.promise;
-					},
-					endWait() {
-						this.end();
-						return self._endDefer.promise;
-					},
-					_getDebug(prefix = '', suffix = '') { return self._getDebug(prefix, suffix); }
-				});
-				stream.on('error', (err) => {
-					console.warn(`${debugPrefix}.bulkWriter.error: ${err.writeErrors||inspect(err, { compact: false })||err.message||err.stack||err}`);//\n\n\top = ${inspect(err)}\n`);
-					self._errors.push(err);
-				});
-				self.on('empty', () => stream.emit('empty'));
-				self.on('drain', () => stream.emit('drain'));
-				self.on('error', err => stream.emit('error', err));
-				return stream;
-			}
-		});
-
-		[ 'insertOne', 'updateOne', 'updateMany', 'deleteOne', 'deleteMany', 'replaceOne' ].forEach(op => {
-			self[op] = (_options = {}) => {
-				_.assign(self.options, {
-					getWriteOp: (data) => {
-						console.debug(`${debugPrefix}.bulkWriter.${op}: ${inspect(data)}`);
-						return _model.schema.bulkWriterOps[op](data);
-					}
-				});
-				console.debug(`${debugPrefix}.bulkWriter.${op}: options.getWriteOp=${self.options.getWriteOp}`);
-				return self;
-			};
-			console.debug(`${debugPrefix}.bulkWriter.${op} = ${self[op].toString()}`);
-		});
-		console.debug(`${debugPrefix}.bulkWriter.options.getWriteOp = ${self.options.getWriteOp}`);
-
-		self._debugInterval(self.options.debugInterval);
-		return self;
-
-		function bulkWrite(batchData, callback) {
-			self._ops++;
-			self.status = 'writing';
-			var now = new Date();
-			var result = _model.bulkWrite(batchData, {ordered: false});
-			(self.options.BulkWriteTimeout === 0 ?result : result.timeout(self.options.BulkWriteTimeout))
-			.then(r => {
-				self._opsDone++;
-				self._writesDone += batchData.length;
-				self.status = 'idle';
-				self._debug(`bulkWrite: batchData.length=${batchData.length}`);
-			}).catch(err => {
-				self._opsFail++;
-				self._writesFail += batchData.length;
-				self.status = 'error';
-				process.nextTick(() => {
-					console.warn(`${debugPrefix}.bulkWrite error: for op=${JSON.stringify(batchData)}:\n${err}`);
-					self._debug();
-					self.emit('error', err);
-					callback(err);			// throw err;	// rethrow so promise chain doesn't continue executing
-				});
-			}).then(() => {
-				callback();
-			}).done();
-		}
-	} });
-
 });
 
 artefactSchema.pre('validate', function(next) {
 	var model = this.constructor;
 	model.stats.saved++;
-	// if (!this._ts.createdAt && !this.isNew) {
-	// 	var e = new Error(`${model.modelName}.pre('validate'): !doc._ts.createdAt !this.isNew ${this.isModified()?'':'!'}this.isModified()`);
-	// 	model.stats.errors.push(e);
-	// 	return next(e);
-	// }
-	// this.unmarkModified('_ts');
-	// this.unmarkModified('_ts.checkedAt');
-	var actionType = this.isNew ? 'created' : (this.isModified() && this.modifiedPaths().length > 2 /*!= [ '_ts', '_ts.checkedAt' ]*/) ? 'updated' : 'checked';
+	var actionType = this.isNew ? 'created' : (this.isModified() && this.modifiedPaths().length > 2) ? 'updated' : 'checked';
 	model.stats[actionType]++;
-	console.verbose(`${model.modelName}.pre('validate'): action=${actionType}: modified=${this.modifiedPaths().join(' ')} doc=${inspect(this._doc)}`);
+	console.debug(`${model.modelName}.pre('validate'): action=${actionType}: modified=${this.modifiedPaths().join(' ')} doc=${inspectPretty(this._doc)}`);
 	next();
 });
-
-/*artefactSchema.pre('save', function(next) {
-	var model = this.constructor;
-	console.verbose(`${model.modelName}.pre('save'): ${inspect(this._doc)}`);
-	return next();
-});
-
-artefactSchema.post('save', function() {
-	var model = this.constructor;
-	console.verbose(`${model.modelName}.post('save'): ${inspect(this._doc)}`);
-});*/
 
 artefactSchema.method('bulkSave', function(maxBatchSize = 10, batchTimeout = 750) {
 	var model = this.constructor;
@@ -270,11 +97,11 @@ artefactSchema.method('bulkSave', function(maxBatchSize = 10, batchTimeout = 750
 	return Q.Promise((resolve, reject, notify) => {
 		this.validate(function(error) {
 			if (error) {
-				console.warn(`${model.modelName}.bulkSave(maxBatchSize=${maxBatchSize}, batchTimeout=${batchTimeout}): validation err=${error} for doc=${inspect(doc._doc)}`);
+				console.warn(`${model.modelName}.bulkSave(maxBatchSize=${maxBatchSize}, batchTimeout=${batchTimeout}): validation err=${error} for doc=${inspectPretty(doc._doc)}`);
 				model.stats.errors.push(error);
 				reject(error);
 			} else {
-				console.verbose(`${model.modelName}.bulkSave(maxBatchSize=${maxBatchSize}, batchTimeout=${batchTimeout}): valid doc=${inspect(doc._doc)}`);
+				console.debug(`${model.modelName}.bulkSave(maxBatchSize=${maxBatchSize}, batchTimeout=${batchTimeout}): valid doc=${inspectPretty(doc._doc)}`);
 				!model._bulkSave && (model._bulkSave = []);
 				var bsOp = null;
 				if (doc.isNew) {
@@ -282,7 +109,7 @@ artefactSchema.method('bulkSave', function(maxBatchSize = 10, batchTimeout = 750
 				} else if (doc._id !== null && doc.isModified()) {
 					bsOp = { updateOne: { filter: { _id: doc.get('_id') }, update: { $set: doc } } };	// TODO: should i only be updating the modified fields? (always includes _ts and _ts.checkedAt)
 				} else {
-					console.verbose(`${model.modelName}.bulkSave unmodified doc=${inspect(doc._doc)}`);
+					console.debug(`${model.modelName}.bulkSave unmodified doc=${inspectPretty(doc._doc)}`);
 				}
 				if (bsOp) {
 					model._bulkSave.push(bsOp);
@@ -303,11 +130,11 @@ artefactSchema.method('bulkSave', function(maxBatchSize = 10, batchTimeout = 750
 					model._bulkSave = [];
 					delete model._bulkSaveTimeout;
 					model.stats.bulkOps++;
-					console.verbose(`${model.modelName}.bulkSave(): bs[${bs.length}]=${inspect(bs)}`);
+					console.debug(`${model.modelName}.bulkSave(): bs[${bs.length}]=${inspectPretty(bs)}`);
 					model.bulkWrite(bs)
-					.catch(err => console.warn(`${model.modelName}.bulkSave error: ${err}`))
+					.catch(err => console.warn(`${model.modelName}.bulkSave error: ${inspectPretty(err)}`))
 					.then(bulkWriteOpResult => {
-						console.verbose(`${model.modelName}.bulkSave(): bulkWriteOpResult=${inspect(bulkWriteOpResult)}`);
+						console.debug(`${model.modelName}.bulkSave(): bulkWriteOpResult=${inspectPretty(bulkWriteOpResult)}`);
 					});
 				}
 			}
@@ -324,7 +151,6 @@ artefactSchema.method('updateDocument', function updateDocument(update, pathPref
 		var docVal = this.get(pathPrefix + k);
 		var updVal = update[k];
 		var schemaType = this.schema.path(pathPrefix + k);
-		// console.debug(`this=${inspectPretty(this)}\nthis.schema=${inspectPretty(this.schema)}\npathPrefix+k=${pathPrefix+k}\nthis.schema.path('${pathPrefix+k}')=${inspectPretty(schemaType)}`);
 		if (schemaType && schemaType.instance === 'Embedded') {
 			console.debug(`updateDocument: ${pathPrefix + k}: Embedded`);
 			this.updateDocument(updVal, pathPrefix + k + '.');
@@ -339,20 +165,12 @@ artefactSchema.method('updateDocument', function updateDocument(update, pathPref
 });
 
 artefactSchema.static('findOrCreate', function findOrCreate(dataTypeName, query, data, cb) {
-	// console.debug(`artefactSchema.findOrCreate('${dataTypeName}', ${inspect(query)}, ${inspect(data)}): this=${inspect(this)}`);
-	// query["data." + dataType.name] = { "$exists": 1 };
-	return this.findOne(query)//{ data: { [dataTypeName]: query } })	//path: path })
-		.then(r => r ? //|| /// *Q.nfbind(this, 'create')({ path: path })*/(new (this)({ path: path }))).updateDocument({ data: data }))
-		r.updateDocument(data, dataTypeName)
-	:  	(new this/*this.create*/({ [dataTypeName]: data })))//({ data: { [dataTypeName]: data } }))
-	.tap(r => console.verbose(`artefactSchema.findOrCreate(${dataTypeName}', ${inspect(query)}, ${inspect(data)}): r = ${inspect(r, { compact: false, depth: 3})}`));
+	let mappedQuery = _.mapKeys(query, (value, key, obj) => key[0] === '$' ? key : dataTypeName + '.' + key);
+	return this.findOne(mappedQuery)
+	.then(r =>	r
+	?	r.updateDocument(data, dataTypeName)
+	:  	(new this({ [dataTypeName]: data })))
+	.tap(r => console.debug(`artefactSchema.findOrCreate('${dataTypeName}', ${inspect(query)}, data=${data?"...":data===null?"null":"undefined"}: mappedQuery=${inspect(mappedQuery)}, r = ${inspectPretty(r)}`));
 });
-
-artefactSchema.query.findByPath = function(path) { return this.where('path', path); };
-
-// artefactSchema.addDataSchema = function artefactSchema_addDataSchema(schemaName, schema) {
-// 	schema.set('_id', false);
-// 	artefactSchema.path('data').add({ schemaName: schema });
-// };
 
 module.exports = artefactSchema;

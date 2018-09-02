@@ -78,7 +78,7 @@ function iterate(path, options/* , pipeStream */) {
 				try {
 					fs.lstat(path, (err, stats) => {
 						if (err) return nextHandleError(err);
-						var item = { path, stats, type: stats.isDirectory() ? 'dir' : stats.isFile() ? 'file' : 'unknown' };
+						var item = { path, stats, fileType: stats.isDirectory() ? 'dir' : stats.isFile() ? 'file' : 'unknown' };
 						if (!stats.isDirectory()) return self.push(item);
 						var currentDepth = pathDepth(item.path) - self.rootDepth + 1;	// +1 because below here next files are read from this dir
 						if ((options.maxDepth === 0) || (currentDepth <= options.maxDepth)) {

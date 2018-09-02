@@ -1,9 +1,9 @@
 //"use strict";
-const console = require('../stdio.js').Get('bin/console', { minLevel: 'log' });	// verbose debug log
+const console = require('../stdio.js').Get('bin/console', { minLevel: 'debug' });	// verbose debug log
 const _ = require('lodash');
 const { formatSize, promisifyEmitter, makeInspect } = require('../utility.js');
 const inspect =	makeInspect({ depth: 1, compact: true });
-const inspectPretty = makeInspect({ depth: 1, compact: false });
+const inspectPretty = makeInspect({ depth: 2, compact: false });
 const fs = require('../fs.js');
 const Q = require('../q.js');
 const mongoose = require('mongoose');
@@ -30,43 +30,33 @@ const doFsScan = function(scan, promiseTransform) {
 	});	
 };
 
-/* const groove = require('groove');
-groove.open("danse-macabre.ogg", function(err, file) {
-  if (err) throw err;
-  console.log(file.metadata());
-  console.log("duration:", file.duration());
-  file.close(function(err) {
-    if (err) throw err;
-  });
-});
-*/
-
 var scanParameters = [
-	{ path: '/home', maxDepth: 3 }
+	{ path: '/home', maxDepth: 1 }
 	// { path: '/mnt/wheel/Trapdoor/mystuff/Moozik', maxDepth: 0 },
 	// { path: '/media/jk/Storage/', maxDepth: 0 }
 	// { path: '/', maxDepth: 4 }
 ];
 
 let schemas = {
-	file: require('../schemas/filesystem.js'),
+	fs: require('../schemas/filesystem.js'),
 	audio: require('../schemas/audio.js')
 };
-_.forEach(_.keys(schemas), key => {
-	artefactSchema.plugin(schemas[key], { typeName: key });
+_.forEach(schemas, (schema, schemaName) => {
+	artefactSchema.plugin(schema, { typeName: schemaName });
 })
 
-// artefactSchema.path('file').validate(function(v) {
-// 	console.log(`artefactSchema.path('file').validate(${inspect(v)})`);
-// 	if (v.fileType === 'file' && (!v.hash || !file.updatedAt || file.isModified('stats.mtime') || (file.updatedAt < (file.stats.mtime)))) {
-// 		return fs.hash(v.path).then(hash => v.hash = hash).then(() => v);
-// 	}
-// 	this./*$parent.*/audio = { length: 100 };
-// 	return true;
-// });
+/*artefactSchema.path('file').validate(function(v) {
+	console.log(`artefactSchema.path('file').validate(${inspect(v)})`);
+	if (v.fileType === 'file' && (!v.hash || !file.updatedAt || file.isModified('stats.mtime') || (file.updatedAt < (file.stats.mtime)))) {
+		return fs.hash(v.path).then(hash => v.hash = hash).then(() => v);
+	}
+	this./*$parent.* /audio = { length: 100 };
+	return true;
+});*/
+
 artefactModel = mongoose.model('fs', artefactSchema);
 
-console.debug(`artefactModel.childSchemas = ${inspectPretty(artefactModel.schema.path('file'))}\nschemas.audio.fileExtensions = ${inspectPretty(schemas.audio.fileExtensions)}`);
+console.debug(`artefactModel.artefactTypes = ${inspectPretty(artefactModel.artefactTypes)}\nschemas.audio.fileExtensions = ${inspectPretty(schemas.audio.fileExtensions)}`);
 
 app.runTask(function appMain() {
 
@@ -74,39 +64,22 @@ app.runTask(function appMain() {
 
 	return Q.allSettled(scanParameters.map(scan =>
 
-		doFsScan(scan, data =>
-			artefactModel.findOrCreate(
-				"file",							// artefact type
-				{ "file.path": data.path },		// find query
-				{								// artefact data to update if found, or create if not
-					path: data.path,
-					fileType: data.type,
-					stats: data.stats
-				})
-			.then(data =>
-				data.file.fileType !== 'file' ? data : data.file.ensureCurrentHash()
-			 	.then(data =>
-			 		schemas.audio.fileExtensions.indexOf(data.file.extension.toLowerCase()) < 0 ? data
-			 	 : 	(!data.audio || data.isNew || data.isModified('file')) ?
-			 		_.assign(data, { audio: { length: 100 }}).audio.loadMetadata()
-			 		 : 	data))
-
-			/* app.models.filesystem.create({ data:*/
-			/* (new (app.artefact)({
-				data: { path: {
-					path: data.path,
-					fileType: data.type,
-					stats: data.stats
-				} }
-			})))*/
-			// .then(data => data.type === 'file' ? data.ensureCurrentHash() : data)
-			/*	.then(file => app.models.audio.validFileExtensions.indexOf(file.extension) < 0 ? file
-					:	Q.nfcall(groove.open, "danse-macabre.ogg")
-						.then(audio => app.models.audio.findOrCreate({ filedId: file._id }, _.assign({ fileId: file._id }, audio)))
-						.then(audio => audio.bulkSave()))
-					.then(audio => file)*/
+		// 180902 TODO: Make this app logic more declarative
+		// Define the app/task-specific artefact logic (e.g. file/audio scenario) by creating a new artefactSchema instance
+		// and adding the desired custom artefact data types as members (see above, "schemas" variable used for artefactSchema.plugin())
+		// These types can utilise suitable hooks/middleware/events on the model/schema to listen for create/update/delete/..? of
+		// artefacts and/or other custom artefact data type instances associated with them.
+		// The app-specific artefactSchema instance is used to construct the model (and therefore mongo db collection) used by
+		// the application/task/library/suite/domain/other scenario.
+		doFsScan(scan, data => artefactModel.artefactTypes.fs.findOrCreate({ "path": data.path }, data)
+			.then(data => data.fs.fileType !== 'file' ?	data
+			: 	data.fs.ensureCurrentHash()
+			 	.then(data => schemas.audio.fileExtensions.indexOf(data.fs.extension.toLowerCase()) < 0 ? data
+			 	: 	!data.audio || data.isNew || data.isModified('file')
+			 		?	_.assign(data, { audio: { length: 100 }}).audio.loadMetadata()
+			 		: 	data 	)	)
 			.then(data => data.bulkSave())
-			.catch(err => { app.onWarning(err, `models.${data.type} '${data.path}' op error`); }))
+			.catch(err => { app.onWarning(err, `models.${data.type} '${data.path}' op error`); }) )
 	
 		.then(() => {
 			app.markPoint(`streamFinish for doFsScan maxDepth=${scan.maxDepth} path='${scan.path}'`, true);
@@ -166,5 +139,5 @@ app.runTask(function appMain() {
 	// debug
 	interval: 13000,	// delay between calling the debug fn below
 	doImmediate: true,	// runs the debug fn immediately on task start, without waiting for interval
-	fn(prefix = '') { console.verbose(`---- stats ---- ${prefix}\napp.artefact.stats: ${inspect (artefactModel.stats)}\n`); }
+	fn(prefix = '') { console.verbose(`---- stats ---- ${prefix}${inspect (artefactModel.stats)}\n`); }
 });

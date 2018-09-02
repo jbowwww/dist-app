@@ -177,7 +177,7 @@ fileSchema.post('bulkSave', function() {
 
 function fileSystemPlugin(artefactSchema, options) {
 	options = options || {};
-	var typeName = options.typeName || 'file';
+	var typeName = options.typeName;// || 'fs';
 	artefactSchema.add({ [typeName]: fsEntrySchema });
 	artefactSchema.path(typeName).discriminator('dir', dirSchema);
 	artefactSchema.path(typeName).discriminator('file', fileSchema);
