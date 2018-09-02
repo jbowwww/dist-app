@@ -128,9 +128,12 @@ artefactSchema.method('bulkSave', function(maxBatchSize = 10, batchTimeout = 750
 			}
 		});
 	});
-
 });
 
+/* This will update a (sub)document while only marking paths modified if a value has changed.
+ * Mongoose was marking the entire FS stats member of fsEntry docs as modified when the values hadn't
+ * actually changed, simply because it was a new instance. IIRC mongoose will mark any path as modified
+ * if it is included in a call to doc.set({...}), even for simple types - there is no comparison test */ 
 artefactSchema.method('updateDocument', function updateDocument(update, pathPrefix = '') {
 	if (!pathPrefix.endsWith('.')) {
 		pathPrefix += '.';
@@ -164,20 +167,19 @@ artefactSchema.static('findOrCreate', function findOrCreate(dataTypeName, query,
 module.exports = function artefactMakeModel(modelName, artefactTypes) {
 	let _artefactSchema = artefactSchema.clone();
 	if (artefactTypes) {
-		_.forEach(artefactTypes, function(artefactPlugin, schemaName) {
-			_artefactSchema.plugin(artefactPlugin, { typeName: schemaName });
+		_.forEach(artefactTypes, (plugin, name) => {
+			_artefactSchema.plugin(plugin, { typeName: name });
 
 		});
 	}
 	let m = mongoose.model(modelName, _artefactSchema);
-	let _at = {};
-	_.forEach(artefactTypes, function(artefactPlugin, pluginName) {
-		_at[pluginName] = _.assign({
-			findOrCreate(query, data, cb) { return m.findOrCreate(pluginName, query, data, cb); }
-		}, artefactPlugin._statics || {});
-		console.debug(`m.artefactTypes: ${inspectPretty(_at)},\nm.artefactTypes['${pluginName}'].findOrCreate: ${inspect(_at[pluginName].findOrCreate)}`);
+	Object.defineProperty(m, 'artefactTypes', {
+		value: _.fromPairs(_.keys(artefactTypes).map(typeName => [typeName, _.assign({
+			findOrCreate(query, data, cb) { return m.findOrCreate(typeName, query, data, cb); }
+		}, artefactTypes[typeName]._statics || {}) ])),
+		writeable: false,
+		configurable: false
 	});
-	Object.defineProperty(m, 'artefactTypes', { value: _at, writeable: false, configurable: false });
-	console.debug(`artefactMakeModel('${modelName}', ${inspectPretty(artefactTypes)}, model=${inspectPretty(m)}`);
+	console.debug(`artefactMakeModel('${modelName}', ${inspectPretty(artefactTypes)}, m.artefactTypes=${inspectPretty(m.artefactTypes)}`);
 	return m;
 };

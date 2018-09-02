@@ -16,6 +16,13 @@ var audioSchema = new mongoose.Schema({
     metadata: {}
 }, { _id: false });
 
+// audioSchema.on('init', model => {
+//     console.log(`embedded model oninit :)`);
+//     Object.defineProperties(model, {
+//         fileExtensions: { value: [ 'wav', 'mp3' ] }
+//     });
+// });
+
 // , {
 //     methods: {
 //
