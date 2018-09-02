@@ -43,10 +43,9 @@ audioSchema.method('loadMetadata', function loadMetadata() {
     var audio = this;
     var artefact = this.$parent;
     var model = this.$parent.constructor;
-    // var debugPrefix = `[${typeof audio} ${model.name}]`;
-    console.verbose(`: audio=${inspectPretty(audio)} artefact=${inspectPretty(artefact)}`);
-    return mm.parseFile(artefact.file.path).then(metadata => {
-        console.verbose(`${debugPrefix}: metadata=${inspectPretty(metadata)}`);
+    console.verbose(`audio=${inspectPretty(audio)} artefact=${inspectPretty(artefact)}`);
+    return mm.parseFile(artefact.fs.path).then(metadata => {
+        console.verbose(`metadata=${inspectPretty(metadata)}`);
         audio.metadata = metadata;
         return artefact;
     });

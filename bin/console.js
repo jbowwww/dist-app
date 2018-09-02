@@ -31,7 +31,7 @@ const doFsScan = function(scan, promiseTransform) {
 };
 
 var scanParameters = [
-	{ path: '/home', maxDepth: 1 }
+	{ path: '/home', maxDepth: 3 }
 	// { path: '/mnt/wheel/Trapdoor/mystuff/Moozik', maxDepth: 0 },
 	// { path: '/media/jk/Storage/', maxDepth: 0 }
 	// { path: '/', maxDepth: 4 }
