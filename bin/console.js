@@ -1,5 +1,5 @@
 //"use strict";
-const console = require('../stdio.js').Get('bin/console', { minLevel: 'debug' });	// verbose debug log
+const console = require('../stdio.js').Get('bin/console', { minLevel: 'verbose' });	// verbose debug log
 const _ = require('lodash');
 const { formatSize, promisifyEmitter, makeInspect } = require('../utility.js');
 const inspect =	makeInspect({ depth: 1, compact: true });
@@ -9,7 +9,8 @@ const Q = require('../q.js');
 const mongoose = require('mongoose');
 const app = require('../app.js');
 
-artefactModel = require('../artefact-schema.js').model('fs', {
+const artefactMakeModel = require('../schemas/artefact.js');
+artefactModel = artefactMakeModel('fs', {
 	fs: require('../schemas/fs'),
 	audio: require('../schemas/audio.js')
 });
@@ -23,7 +24,7 @@ artefactModel = require('../artefact-schema.js').model('fs', {
 	return true;
 });*/
 
-console.debug(`artefactModel.artefactTypes = ${inspectPretty(artefactModel.artefactTypes)}\nschemas.audio.fileExtensions = ${inspectPretty(schemas.audio.fileExtensions)}`);
+console.debug(`artefactModel.artefactTypes = ${inspectPretty(artefactModel.artefactTypes)}\nschemas.audio.fileExtensions = ${inspectPretty(artefactModel.schema.path('audio').fileExtensions)}`);
 
 function doFsScan(scan, promiseTransform) {
 	console.verbose(`FS scan maxDepth=${scan.maxDepth} path='${scan.path}'`);
@@ -68,7 +69,7 @@ app.runTask(function appMain() {
 		doFsScan(scan, data => artefactModel.artefactTypes.fs.findOrCreate({ "path": data.path }, data)
 			.then(data => data.fs.fileType !== 'file' ?	data
 			: 	data.fs.ensureCurrentHash()
-			 	.then(data => schemas.audio.fileExtensions.indexOf(data.fs.extension.toLowerCase()) < 0 ? data
+			 	.then(data => artefactModel.artefactTypes.audio.fileExtensions.indexOf(data.fs.extension.toLowerCase()) < 0 ? data
 			 	: 	!data.audio || data.isNew || data.isModified('file')
 			 		?	_.assign(data, { audio: { length: 100 }}).audio.loadMetadata()
 			 		: 	data 	)	)

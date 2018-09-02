@@ -9,7 +9,7 @@ const path = require('path');
 const Q = require('./q.js');
 const mongoose = require('mongoose');
 mongoose.Promise = Q.Promise;
-const artefactSchema = require('./artefact-schema.js');
+const artefactSchema = require('./schemas/artefact.js');
 const express = require('express');
 const bodyParser = require('body-parser');
 const Timestamps = require('./timestamps.js');
@@ -124,7 +124,7 @@ process.on('SIGINT', () => {
 
 app._init('db', mongoose.connect(app.options.db.url));
 app._init('baseHash', fs.hash(path.resolve(__dirname, __filename)));
-app._init('schemas', app.loadSchemas());
+// app._init('schemas', app.loadSchemas());
 
 function isPromise(pr) {
 	return typeof pr === 'object' && typeof pr.then === 'function';// && pr.put;

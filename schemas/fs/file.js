@@ -1,9 +1,10 @@
 "use strict";
 
-const console = require('./stdio.js').Get('schemas/fs/file', { minLevel: 'verbose' });	// log verbose debug
-const inspect = require('./utility.js').makeInspect({ depth: 2, compact: true /* false */ });
-const inspectPretty = require('./utility.js').makeInspect({ depth: 2, compact: false });
+const console = require('../../stdio.js').Get('schemas/fs/file', { minLevel: 'log' });	// log verbose debug
+const inspect = require('../../utility.js').makeInspect({ depth: 2, compact: true /* false */ });
+const inspectPretty = require('../../utility.js').makeInspect({ depth: 2, compact: false });
 const util = require('util');
+const baseFs = require('../../fs.js');
 const _ = require('lodash');
 const Q = require('q');
 const mongoose = require('mongoose');
@@ -14,7 +15,7 @@ let fileSchema = fsEntry.clone();//new mongoose.Schema({
 
 fileSchema.add({
 	hash: { type: String, required: false }
-}, { _id: false });
+});//, { _id: false });
 
 // Will this be useful? Bevcause I believe virtuals cannot be used in a mongo query
 fileSchema.virtual('extension').get(function extension() {

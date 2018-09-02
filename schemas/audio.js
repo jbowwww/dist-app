@@ -1,5 +1,5 @@
 "use strict";
-var console = require('../stdio.js').Get('modules/audio', { minLevel: 'verbose' });	// debug verbose
+var console = require('../stdio.js').Get('modules/audio', { minLevel: 'debug' });	// debug verbose
 const inspect =	require('../utility.js').makeInspect({ depth: 1, compact: true });
 const inspectPretty = require('../utility.js').makeInspect({ depth: 1, compact: false /* true */ });
 const baseFs = require('../fs.js');
@@ -57,6 +57,8 @@ function audioPlugin(artefactSchema, options) {
     artefactSchema.add({ [typeName]: audioSchema });
 }
 
-Object.defineProperty(audioPlugin, 'fileExtensions', { value: [ 'wav', 'mp3' ]});
+audioPlugin._statics = {
+    fileExtensions: [ 'wav', 'mp3' ]
+};
 
 module.exports = audioPlugin;// audioSchema;// AudioArtefact;//{ audio: Audio };
