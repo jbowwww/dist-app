@@ -8,9 +8,24 @@ const fs = require('../fs.js');
 const Q = require('../q.js');
 const mongoose = require('mongoose');
 const app = require('../app.js');
-const artefactSchema = require('../artefact-schema.js');
 
-const doFsScan = function(scan, promiseTransform) {
+artefactModel = require('../artefact-schema.js').model('fs', {
+	fs: require('../schemas/fs'),
+	audio: require('../schemas/audio.js')
+});
+
+/*artefactSchema.path('file').validate(function(v) {
+	console.log(`artefactSchema.path('file').validate(${inspect(v)})`);
+	if (v.fileType === 'file' && (!v.hash || !file.updatedAt || file.isModified('stats.mtime') || (file.updatedAt < (file.stats.mtime)))) {
+		return fs.hash(v.path).then(hash => v.hash = hash).then(() => v);
+	}
+	this./*$parent.* /audio = { length: 100 };
+	return true;
+});*/
+
+console.debug(`artefactModel.artefactTypes = ${inspectPretty(artefactModel.artefactTypes)}\nschemas.audio.fileExtensions = ${inspectPretty(schemas.audio.fileExtensions)}`);
+
+function doFsScan(scan, promiseTransform) {
 	console.verbose(`FS scan maxDepth=${scan.maxDepth} path='${scan.path}'`);
 	return Q.Promise((resolve, reject) => {	
 		fs.iterate(scan.path, scan).pipe(new require('stream').Writable({
@@ -30,35 +45,14 @@ const doFsScan = function(scan, promiseTransform) {
 	});	
 };
 
-var scanParameters = [
-	{ path: '/home', maxDepth: 3 }
-	// { path: '/mnt/wheel/Trapdoor/mystuff/Moozik', maxDepth: 0 },
-	// { path: '/media/jk/Storage/', maxDepth: 0 }
-	// { path: '/', maxDepth: 4 }
-];
-
-let schemas = {
-	fs: require('../schemas/filesystem.js'),
-	audio: require('../schemas/audio.js')
-};
-_.forEach(schemas, (schema, schemaName) => {
-	artefactSchema.plugin(schema, { typeName: schemaName });
-})
-
-/*artefactSchema.path('file').validate(function(v) {
-	console.log(`artefactSchema.path('file').validate(${inspect(v)})`);
-	if (v.fileType === 'file' && (!v.hash || !file.updatedAt || file.isModified('stats.mtime') || (file.updatedAt < (file.stats.mtime)))) {
-		return fs.hash(v.path).then(hash => v.hash = hash).then(() => v);
-	}
-	this./*$parent.* /audio = { length: 100 };
-	return true;
-});*/
-
-artefactModel = mongoose.model('fs', artefactSchema);
-
-console.debug(`artefactModel.artefactTypes = ${inspectPretty(artefactModel.artefactTypes)}\nschemas.audio.fileExtensions = ${inspectPretty(schemas.audio.fileExtensions)}`);
-
 app.runTask(function appMain() {
+
+	var scanParameters = [
+		{ path: '/home', maxDepth: 3 }
+		// { path: '/mnt/wheel/Trapdoor/mystuff/Moozik', maxDepth: 0 },
+		// { path: '/media/jk/Storage/', maxDepth: 0 }
+		// { path: '/', maxDepth: 4 }
+	];
 
 	console.log(`${scanParameters.length} FS scan targets: ${inspectPretty(scanParameters)}`);
 

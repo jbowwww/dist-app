@@ -8,43 +8,23 @@ const _ = require('lodash');
 const Q = require('q');
 const mongoose = require('mongoose');
 
-function timestampSchemaPlugin(schema, options) {
-	schema.add({
-		_ts: {
-			createdAt: { type: Date, required: true, default: () => Date.now() },
-			checkedAt: { type: Date, required: false },
-			updatedAt: { type: Date, required: false },
-			deletedAt: { type: Date, required: false }
-		}
-	});//, { _id: false });
-	
-	schema.pre('validate', function(next) {
-		var model = this.constructor;
-		if (!this._ts.createdAt && !this.isNew) {
-			var e = new Error(`${model.modelName}.pre('validate')#timestampSchemaPlugin: !doc._ts.createdAt !this.isNew ${this.isModified()?'':'!'}this.isModified()`);
-			return next(e);
-		}
-		var actionType = this.isNew ? 'created' : this.isModified() ? 'updated' : 'checked';
-		this._ts[actionType + 'At']  = new Date();	// cascade current timestamp across the create,updated,checked TS's
-		!this._ts.updatedAt && (this._ts.updatedAt = this._ts.createdAt);
-		!this._ts.checkedAt && (this._ts.checkedAt = this._ts.updatedAt);
-		// console.verbose(`${model.modelName}.pre('validate')#timestampSchemaPlugin: ${this.modifiedPaths().join(' ')}`);
-		return next();
-	});
-
-	schema.virtual('isDeleted', function() {
-		return this._ts.deletedAt && this._ts.deletedAt <= Date.now();
-	});
-	
-	schema.method('markDeleted', function(timestamp = Date.now()) {
-		if (this._ts.deletedAt) { console.warn(`Doc being marked deleted already has deletedAt=${this._ts.deletedAt}`); }
-		this._ts.deletedAt = timestamp;
-		return Q(this);
-	});
-}
-
 var artefactSchema = new mongoose.Schema({ });
-artefactSchema.plugin(timestampSchemaPlugin);
+
+artefactSchema.plugin(require('./timestamp-plugin.js'));
+
+Object.defineProperty(artefactSchema, 'plugins', { value: function artefactSchema_plugins(schemas) {
+	_.forEach(schemas, (schema, schemaName) => {
+		artefactSchema.plugin(schema, { typeName: schemaName });
+	});
+	return artefactSchema;
+} });
+
+Object.defineProperty(artefactSchema, 'model', { value: function artefactSchema_model(modelName, schemas) {
+	if (schemas) {
+		artefactSchema.plugins(schemas);
+	}
+	return mongoose.model(modelName, artefactSchema);
+} });
 
 artefactSchema.on('init', function onSchemaInit(_model, ...args) {
 	var debugPrefix = `model:${_model.modelName}`;
