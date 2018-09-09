@@ -4,9 +4,9 @@ const inspect =	require('../../utility.js').makeInspect({ depth: 3, compact: fal
 const inspectPretty =	require('../../utility.js').makeInspect({ depth: 3, compact: true });
 const baseFs = require('../../fs.js');
 const _ = require('lodash');
-const Q = require('q');
-const mongoose = require('mongoose');
-const moment = require('moment');
+// const Q = require('q');
+// const mongoose = require('mongoose');
+// const moment = require('moment');
 
 let fsEntrySchema = require('./fsEntry.js');
 let dirSchema = require('./dir.js');

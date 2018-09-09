@@ -1,17 +1,16 @@
 "use strict";
-
 const console = require('../../stdio.js').Get('schemas/fs/file', { minLevel: 'log' });	// log verbose debug
 const inspect = require('../../utility.js').makeInspect({ depth: 2, compact: true /* false */ });
 const inspectPretty = require('../../utility.js').makeInspect({ depth: 2, compact: false });
-const util = require('util');
+// const util = require('util');
 const baseFs = require('../../fs.js');
 const _ = require('lodash');
 const Q = require('q');
-const mongoose = require('mongoose');
+// const mongoose = require('mongoose');
 
 let fsEntry = require('./fsEntry.js');
 
-let fileSchema = fsEntry.clone();//new mongoose.Schema({
+let fileSchema = fsEntry.clone();
 
 fileSchema.add({
 	hash: { type: String, required: false }
@@ -37,7 +36,15 @@ fileSchema.methods.ensureCurrentHash = function(cb) {
 		console.warn(`${debugPrefix}.ensureCurrentHash() called for ${model.name} data with fileType='${file.fileType}', should only be called for files!`);
 	}
 	if (!model.stats.ensureCurrentHash) {
-		model.stats.ensureCurrentHash = { hashValid: 0, hashUpdated: 0, hashCreated: 0, errors: [], get total() { return this.hashValid + this.hashUpdated + this.hashCreated + this.errors.length; } };
+		model.stats.ensureCurrentHash = {
+			hashValid: 0, hashUpdated: 0, hashCreated: 0,
+			errors: [],
+			get total() { return this.hashValid + this.hashUpdated + this.hashCreated + this.errors.length; },
+			format(indent = 1) {
+				return `total: ${this.total}, hashValid: ${this.hashValid}, hashUpdated: ${this.hashUpdated}, hashCreated: ${this.hashCreated}, errors: [ ${this.errors.length} ]`.trim('\n');//:\n${this.errors.map(errString => errString + '\n').join(',')}`;
+			}
+		};
+		model.stats._extraFields.push('ensureCurrentHash');
 	}
 	if (!model._hashQueue) {
 		model._hashQueue = {

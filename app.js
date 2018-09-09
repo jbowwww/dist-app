@@ -122,7 +122,7 @@ process.on('SIGINT', () => {
 	app.exit(0);
 });
 
-app._init('db', mongoose.connect(app.options.db.url));
+app._init('db', mongoose.connect(app.options.db.url, { useNewUrlParser: true }));
 app._init('baseHash', fs.hash(path.resolve(__dirname, __filename)));
 // app._init('schemas', app.loadSchemas());
 

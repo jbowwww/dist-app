@@ -10,13 +10,12 @@ const Q = require('q');
 module.exports = function timestampSchemaPlugin(schema, options) {
 	schema.add({
 		_ts: {
-			createdAt: { type: Date, required: true, default: () => Date.now() },
-			checkedAt: { type: Date, required: false },
-			updatedAt: { type: Date, required: false },
-			deletedAt: { type: Date, required: false }
-		}
-	});//, { _id: false });
-	
+		createdAt: { type: Date, required: true, default: () => Date.now() },
+		checkedAt: { type: Date, required: false },
+		updatedAt: { type: Date, required: false },
+		deletedAt: { type: Date, required: false }
+	} });
+
 	schema.pre('validate', function(next) {
 		var model = this.constructor;
 		if (!this._ts.createdAt && !this.isNew) {

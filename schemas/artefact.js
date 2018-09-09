@@ -7,11 +7,12 @@ const util = require('util');
 const _ = require('lodash');
 const Q = require('q');
 const mongoose = require('mongoose');
+const timestampPlugin = require('./timestamp-plugin.js');
 
 var artefactSchema = new mongoose.Schema({ });
 var isBulkSave = false;
 
-artefactSchema.plugin(require('./timestamp-plugin.js'));
+artefactSchema.plugin(timestampPlugin);
 
 artefactSchema.on('init', function onSchemaInit(_model, ...args) {
 	var debugPrefix = `model:${_model.modelName}`;
@@ -45,7 +46,19 @@ artefactSchema.on('init', function onSchemaInit(_model, ...args) {
 		checked: 0,										// number of objects that were passed to doc.store() that were not new or modified, and so did not require db actions
 		found: 0,										// results found pre-existing in db in model.findOrCreate()
 		constructed: 0,									// results from model.findOrCreate that were constructed using new Model()
-		errors: []
+		errors: [],
+		_extraFields: [],							// extra field names to include in inspect() 'e.g. ensureCurrentHash' on file artefact
+		format(indent = 1) {
+			return `\n${'\t'.repeat(indent)}bulkOps: ${this.bulkOps}, bulkOpSuccess: ${this.bulkOpSuccess}, bulkWrites: ${this.bulkWrites},\n`
+			 +	`${'\t'.repeat(indent)}saved: ${this.saved}, validated: ${this.validated},\n`
+			 +	`${'\t'.repeat(indent)}created: ${this.created}, updated: ${this.updated}, checked: ${this.checked}\n`
+			 +	`${'\t'.repeat(indent)}found: ${this.found}, constructed: ${this.constructed},\n`
+			 +	`${'\t'.repeat(indent)}errors (${this.errors.length}):`
+			 +	this.errors.map(errString => '\n' + '\t'.repeat(indent) + errString)
+			 +	this._extraFields.map(field => '\n' + '\t'.repeat(indent) + field + ': '
+			 	+ (this[field].format ? this[field].format(indent + 1)
+			 	: this[field].toString()));
+		}
 	} });
 });
 
@@ -169,7 +182,7 @@ module.exports = function artefactMakeModel(modelName, artefactTypes) {
 	if (artefactTypes) {
 		_.forEach(artefactTypes, (plugin, name) => {
 			_artefactSchema.plugin(plugin, { typeName: name });
-
+			// _artefactSchema.path(name).schema.plugin(timestampPlugin);
 		});
 	}
 	let m = mongoose.model(modelName, _artefactSchema);

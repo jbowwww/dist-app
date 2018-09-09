@@ -24,7 +24,7 @@ artefactModel = artefactMakeModel('fs', {
 	return true;
 });*/
 
-console.debug(`artefactModel.artefactTypes = ${inspectPretty(artefactModel.artefactTypes)}\nschemas.audio.fileExtensions = ${inspectPretty(artefactModel.schema.path('audio').fileExtensions)}`);
+console.debug(`artefactModel = ${inspectPretty(artefactModel)}`);
 
 function doFsScan(scan, promiseTransform) {
 	console.verbose(`FS scan maxDepth=${scan.maxDepth} path='${scan.path}'`);
@@ -77,8 +77,7 @@ app.runTask(function appMain() {
 			.catch(err => { app.onWarning(err, `models.${data.type} '${data.path}' op error`); }) )
 	
 		.then(() => {
-			app.markPoint(`streamFinish for doFsScan maxDepth=${scan.maxDepth} path='${scan.path}'`, true);
-			console.log(`Testing unmodified FS DB entries for existence...`)
+			console.verbose(`Testing unmodified FS DB entries for existence...`)
 			var pathRegex = new RegExp(`^${(scan.path).replace(/\//, '\\/')}(\\/[^\/]*){1,${scan.maxDepth === 0 ? '' : scan.maxDepth}}$`);
 			var query = {
 				path: {
@@ -134,5 +133,5 @@ app.runTask(function appMain() {
 	// debug
 	interval: 13000,	// delay between calling the debug fn below
 	doImmediate: true,	// runs the debug fn immediately on task start, without waiting for interval
-	fn(prefix = '') { console.verbose(`---- stats ---- ${prefix}${inspect (artefactModel.stats)}\n`); }
+	fn(prefix = '') { console.verbose(`---- stats ---- ${prefix}${artefactModel.stats.format(1)}`); }
 });
