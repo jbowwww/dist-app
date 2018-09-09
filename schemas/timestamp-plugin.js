@@ -19,14 +19,15 @@ module.exports = function timestampSchemaPlugin(schema, options) {
 	schema.pre('validate', function(next) {
 		var model = this.constructor;
 		if (!this._ts.createdAt && !this.isNew) {
-			var e = new Error(`${model.modelName}.pre('validate')#timestampSchemaPlugin: !doc._ts.createdAt !this.isNew ${this.isModified()?'':'!'}this.isModified()`);
-			return next(e);
+			return next(new Error(`${model.modelName}.pre('validate')#timestampSchemaPlugin: !doc._ts.createdAt !this.isNew ${this.isModified()?'':'!'}this.isModified()`));
+		} else if (this._ts.created && this.isNew) {
+			return next(new Error(`${model.modelName}.pre('validate')#timestampSchemaPlugin: doc._ts.createdAt && this.isNew ${this.isModified()?'':'!'}this.isModified()`));
 		}
 		var actionType = this.isNew ? 'created' : this.isModified() ? 'updated' : 'checked';
-		this._ts[actionType + 'At']  = new Date();	// cascade current timestamp across the create,updated,checked TS's
+		// this._ts[actionType + 'At']  = new Date();	// cascade current timestamp across the create,updated,checked TS's
 		!this._ts.updatedAt && (this._ts.updatedAt = this._ts.createdAt);
 		!this._ts.checkedAt && (this._ts.checkedAt = this._ts.updatedAt);
-		// console.verbose(`${model.modelName}.pre('validate')#timestampSchemaPlugin: ${this.modifiedPaths().join(' ')}`);
+		console.verbose(`${model.modelName}.pre('validate')#timestampSchemaPlugin: actionType=${actionType} isNew=${this.isNew} ${this.modifiedPaths().join(' ')}`);
 		return next();
 	});
 
