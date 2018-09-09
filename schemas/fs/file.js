@@ -60,7 +60,7 @@ fileSchema.methods.ensureCurrentHash = function(cb) {
 	return Q.Promise((resolve, reject, notify) => {
 		var oldHash = file.hash;
 		console.verbose(`${debugPrefix}.ensureCurrentHash: file='${file.path}' modifiedPaths=${file.modifiedPaths().join(' ')} tsu=${file./*$parent.*/_ts.updatedAt} mtime=${file.stats.mtime} tsu-mtime=${file./*$parent.*/_ts.updatedAt - file.stats.mtime}`);
-		if (!oldHash || !file.$/*parent.*/_ts.updatedAt || file.isModified('stats.mtime') || (file./*$parent.*/_ts.updatedAt < (file.stats.mtime))) {	// need to add file.isModified() to this list of conditions?
+		if (!oldHash || !file./*$parent.*/_ts.updatedAt || file.isModified('stats.mtime') || (file./*$parent.*/_ts.updatedAt < (file.stats.mtime))) {	// need to add file.isModified() to this list of conditions?
 			if (!oldHash) { console.verbose(`${debugPrefix}.ensureCurrentHash: undefined file.hash, hashing...`); }
 			else { console.verbose(`${debugPrefix}.ensureCurrentHash: outdated file.hash=..${file.hash.substr(-6)}, hashing...`); }
 			// return model._hashQueue.push(file).then(file => { if (cb) cb(null, file); return file; });
