@@ -49,11 +49,10 @@ artefactSchema.on('init', function onSchemaInit(_model, ...args) {
 		errors: [],
 		_extraFields: [],							// extra field names to include in inspect() 'e.g. ensureCurrentHash' on file artefact
 		format(indent = 1) {
-			return `\n${'\t'.repeat(indent)}bulkOps: ${this.bulkOps}, bulkOpSuccess: ${this.bulkOpSuccess}, bulkWrites: ${this.bulkWrites},\n`
-			 +	`${'\t'.repeat(indent)}saved: ${this.saved}, validated: ${this.validated},\n`
-			 +	`${'\t'.repeat(indent)}created: ${this.created}, updated: ${this.updated}, checked: ${this.checked}\n`
+			return `\n`
+			 +	`${'\t'.repeat(indent)}saved: ${this.saved}, validated: ${this.validated}, created: ${this.created}, updated: ${this.updated}, checked: ${this.checked}`
 			 +	`${'\t'.repeat(indent)}found: ${this.found}, constructed: ${this.constructed},\n`
-			 +	`${'\t'.repeat(indent)}errors (${this.errors.length}):`
+			 +	`${'\t'.repeat(indent)}bulkOps: ${this.bulkOps}, bulkOpSuccess: ${this.bulkOpSuccess}, bulkWrites: ${this.bulkWrites}, errors (${this.errors.length}):`
 			 +	this.errors.map(errString => '\n' + '\t'.repeat(indent) + errString)
 			 +	this._extraFields.map(field => '\n' + '\t'.repeat(indent) + field + ': '
 			 	+ (this[field].format ? this[field].format(indent + 1)

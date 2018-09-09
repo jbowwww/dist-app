@@ -1,5 +1,5 @@
 "use strict";
-var console = require('../../stdio.js').Get('schemas/fs/fsEntry', { minLevel: 'verbose' });	// debug verbose log
+var console = require('../../stdio.js').Get('schemas/fs/fsEntry', { minLevel: 'debug' });	// debug verbose log
 const inspect =	require('../../utility.js').makeInspect({ depth: 2, compact: true });
 const inspectPretty =	require('../../utility.js').makeInspect({ depth: 2, compact: false });
 const mongoose = require('mongoose');
