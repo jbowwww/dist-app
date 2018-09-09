@@ -1,7 +1,7 @@
 "use strict";
 const console = require('../../stdio.js').Get('schemas/fs/file', { minLevel: 'log' });	// log verbose debug
 const inspect = require('../../utility.js').makeInspect({ depth: 2, compact: true /* false */ });
-const inspectPretty = require('../../utility.js').makeInspect({ depth: 2, compact: false });
+const inspectPretty = require('../../utility.js').makeInspect({ depth: 3, compact: false });
 // const util = require('util');
 const baseFs = require('../../fs.js');
 const _ = require('lodash');
@@ -127,6 +127,23 @@ fileSchema.aggregates = {
 	}
 };
 
+// So it seems that when a schema is used as a child schema (subdocument), schema.on('init') never fires
+// Normally schema.on('init') normally signals the model has been built - but it's not exactly a model when its a subdoc, so I guess it makes sense?
+// One thing to note that isn't clear in mongoose doc's: on('init') signals the model has been built for schema, hpwever the pre() and post('init')
+// middlewares are -entirely different- : They are connected to creation of a new -document- (or subdocument? still seems to fire them when used as a subdoc)
+fileSchema.on('init', function onFileSchemaInit(model, ...args) {
+	var debugPrefix = `model:${_model.modelName}`;
+	console.debug(`${debugPrefix}:fileSchema.on(init): model=${inspectPretty(_model)}, args=${inspectPretty(args)}, this=${inspectPretty(this)}`);
+});
+
+fileSchema.pre('init', function(pojo, ...args) {
+	console.debug(`fileSchema.pre(init): pojo=${inspectPretty(pojo)} args=${inspectPretty(args)}, this=${inspectPretty(this)}`);
+});
+
+fileSchema.post('init', function(doc, ...args) {
+	console.debug(`fileSchema.post(init): doc=${inspectPretty(doc)} args=${inspectPretty(args)}, this=${inspectPretty(this)}`);
+});
+
 fileSchema.pre('validate', function(next) {
 	// var model = this.constructor;
 	console.verbose(`fileSchema.pre('validate'): isNew=${this.isNew} isModified=${this.isModified()} modified=${this.modifiedPaths().join(', ')}`);
@@ -151,5 +168,7 @@ fileSchema.pre('bulkSave', function(next) {
 fileSchema.post('bulkSave', function() {
 	console.verbose(`fileSchema.post('bulkSave'): isNew=${this.isNew} isModified=${this.isModified()} modified=${this.modifiedPaths().join(', ')}\n\tdoc=${inspectPretty(this)}`);
 });
+
+console.verbose(`fileSchema: ${inspectPretty(fileSchema)}`);
 
 module.exports = fileSchema;

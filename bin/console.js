@@ -25,6 +25,7 @@ artefactModel = artefactMakeModel('fs', {
 });*/
 
 console.debug(`artefactModel = ${inspectPretty(artefactModel)}`);
+console.verbose(`mongoose.modelNames() = ${inspectPretty(mongoose.modelNames())}`);
 
 function doFsScan(scan, promiseTransform) {
 	console.verbose(`FS scan maxDepth=${scan.maxDepth} path='${scan.path}'`);

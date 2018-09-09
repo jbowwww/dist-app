@@ -16,6 +16,7 @@ artefactSchema.plugin(timestampPlugin);
 
 artefactSchema.on('init', function onSchemaInit(_model, ...args) {
 	var debugPrefix = `model:${_model.modelName}`;
+	console.debug(`${debugPrefix}:artefactSchema.on(init): model=${inspectPretty(_model)}, args=${inspectPretty(args)}, this=${inspectPretty(this)}`);
 	var schema = this;
 
 	// Object.defineProperty(_model, 'artefactTypes', { value: _.fromPairs(_.keys(schema.paths).filter(key => key[0] !== '_').map(key => [ key, {
@@ -59,6 +60,14 @@ artefactSchema.on('init', function onSchemaInit(_model, ...args) {
 			 	: this[field].toString()));
 		}
 	} });
+});
+
+artefactSchema.pre('init', function(pojo, ...args) {
+	console.debug(`artefactSchema.pre(init): pojo=[${pojo.constructor.name}]${inspectPretty(pojo)} args=${inspectPretty(args)}, this=${inspectPretty(this)}`);
+});
+
+artefactSchema.post('init', function(doc, ...args) {
+	console.debug(`artefactSchema.post(init): doc=[${doc.constructor.name}]${inspectPretty(doc)} args=${inspectPretty(args)}, this=${inspectPretty(this)}`);
 });
 
 artefactSchema.post('save', function(next) {
