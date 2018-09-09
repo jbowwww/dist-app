@@ -67,6 +67,13 @@ app.runTask(function appMain() {
 		// artefacts and/or other custom artefact data type instances associated with them.
 		// The app-specific artefactSchema instance is used to construct the model (and therefore mongo db collection) used by
 		// the application/task/library/suite/domain/other scenario.
+
+		// 180909 OK so new approach. The file system scan(s) by doFsScan will be one, separate, distinct, standalone task.
+		// All it does is scan for fs entries (files&dirs) and uses findOrCreate to save them to the DB
+		// (TODO: Decide if hash should be called before saving to DB, or whether should save to DB then populate hashes separately, perhaps only selectively depending on file characteristics eg size, extension)
+		// Once the fsEntry (ie file or dir) objects are created, they can be periodically queried (using aggregation is probably best) by other data types -
+		// e.g. audio would want fs.fileType=='file', audio.fileExtensions.contains(fs.extension)
+		// it would also want (perhaps handled somehwat automatically by some of my plumbing code) to ignore artefacts where data.audio._ts
 		doFsScan(scan, data => artefactModel.artefactTypes.fs.findOrCreate({ "path": data.path }, data)
 			.then(data => data.fs.fileType !== 'file' ?	data
 			: 	data.fs.ensureCurrentHash()
