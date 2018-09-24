@@ -1,12 +1,11 @@
 "use strict";
-const console = require('../../stdio.js').Get('schemas/fs/file', { minLevel: 'log' });	// log verbose debug
+const console = require('../../stdio.js').Get('schemas/fs/file', { minLevel: 'verbose' });	// log verbose debug
 const inspect = require('../../utility.js').makeInspect({ depth: 2, compact: true /* false */ });
 const inspectPretty = require('../../utility.js').makeInspect({ depth: 3, compact: false });
 // const util = require('util');
 const baseFs = require('../../fs.js');
 const _ = require('lodash');
 const Q = require('q');
-// const mongoose = require('mongoose');
 
 let fsEntry = require('./fsEntry.js');
 
@@ -30,28 +29,31 @@ fileSchema.query.hasHash = function() { return this.exists('hash'); };
  */
 fileSchema.methods.ensureCurrentHash = function(cb) {
 	var file = this;
-	var model = this.$parent.constructor;
-	var debugPrefix = `[${typeof file} ${model.name}]`;
+	var artefact = this.$parent;
+	var model = this.constructor;
+	var stats = artefact.constructor.stats; //artefact.artefactTypes.stats.subTypes.
+	// console.verbose(`${debugPrefix}.ensureCurrentHash():  file='${file.path}' artfeact=${inspectPretty(artefact)} model=${inspect(model)}`)
+	var debugPrefix = `[${typeof model} ${model.name}]`;
 	if (file.fileType !== 'file') {		// ensure is an actual file and nota dir or 'unknown' or otherwise
 		console.warn(`${debugPrefix}.ensureCurrentHash() called for ${model.name} data with fileType='${file.fileType}', should only be called for files!`);
 	}
-	if (!model.stats.ensureCurrentHash) {
-		model.stats.ensureCurrentHash = {
+	if (!stats.ensureCurrentHash) {
+		stats.ensureCurrentHash = {
 			hashValid: 0, hashUpdated: 0, hashCreated: 0,
 			errors: [],
-			get total() { return this.hashValid + this.hashUpdated + this.hashCreated + this.errors.length; },
-			format(indent = 1) {
-				return `total: ${this.total}, hashValid: ${this.hashValid}, hashUpdated: ${this.hashUpdated}, hashCreated: ${this.hashCreated}, errors: [ ${this.errors.length} ]`.trim('\n');//:\n${this.errors.map(errString => errString + '\n').join(',')}`;
-			}
+			get total() { return this.hashValid + this.hashUpdated + this.hashCreated + this.errors.length; }//,
+			// format(indent = 1) {
+			// 	return `total: ${this.total}, hashValid: ${this.hashValid}, hashUpdated: ${this.hashUpdated}, hashCreated: ${this.hashCreated}, errors: [ ${this.errors.length} ]`.trim('\n');//:\n${this.errors.map(errString => errString + '\n').join(',')}`;
+			// }
 		};
-		model.stats._extraFields.push('ensureCurrentHash');
+		// stats._extraFields.push('ensureCurrentHash');
 	}
 	if (!model._hashQueue) {
 		model._hashQueue = {
 			push(data) {
 				return fs.hash(file.path).then(hash => {
 					file.hash = hash;
-					console.verbose(`${debugPrefix}.ensureCurrentHash: computed file.hash=..${hash.substr(-6)}`);
+					console.verbose(`${debugPrefix}.ensureCurrentHash:  file='${file.path}' computed file.hash=..${hash.substr(-6)}`);
 					return file;
 				});//.catch(err=>reject(err))//done();
 			}
@@ -59,24 +61,24 @@ fileSchema.methods.ensureCurrentHash = function(cb) {
 	}
 	return Q.Promise((resolve, reject, notify) => {
 		var oldHash = file.hash;
-		console.verbose(`${debugPrefix}.ensureCurrentHash: file='${file.path}' modifiedPaths=${file.modifiedPaths().join(' ')} tsu=${file./*$parent.*/_ts.updatedAt} mtime=${file.stats.mtime} tsu-mtime=${file./*$parent.*/_ts.updatedAt - file.stats.mtime}`);
-		if (!oldHash || !file./*$parent.*/_ts.updatedAt || file.isModified('stats.mtime') || (file./*$parent.*/_ts.updatedAt < (file.stats.mtime))) {	// need to add file.isModified() to this list of conditions?
-			if (!oldHash) { console.verbose(`${debugPrefix}.ensureCurrentHash: undefined file.hash, hashing...`); }
-			else { console.verbose(`${debugPrefix}.ensureCurrentHash: outdated file.hash=..${file.hash.substr(-6)}, hashing...`); }
+		console.debug(`${debugPrefix}.ensureCurrentHash: file='${file.path}' modifiedPaths=${file.modifiedPaths().join(' ')} tsu=${file._ts.updatedAt} mtime=${file.stats.mtime} tsu-mtime=${file._ts.updatedAt - file.stats.mtime}`);
+		if (!oldHash || !file._ts.updatedAt || file.isModified('stats.mtime') || (file._ts.updatedAt < (file.stats.mtime))) {
+			if (!oldHash) { console.verbose(`${debugPrefix}.ensureCurrentHash: file='${file.path}' undefined file.hash, hashing...`); }
+			else { console.verbose(`${debugPrefix}.ensureCurrentHash: file='${file.path}' outdated file.hash=..${file.hash.substr(-6)}, hashing...`); }
 			// return model._hashQueue.push(file).then(file => { if (cb) cb(null, file); return file; });
 			baseFs.hash(file.path).then((hash) => {
-				if (!oldHash) { model.stats.ensureCurrentHash.hashCreated++; }
-				else { model.stats.ensureCurrentHash.hashUpdated++; }
+				if (!oldHash) { stats.ensureCurrentHash.hashCreated++; }
+				else { stats.ensureCurrentHash.hashUpdated++; }
 				file.hash = hash;
-				console.verbose(`${debugPrefix}.ensureCurrentHash: computed file.hash=..${hash.substr(-6)}`);
-				resolve(file.$parent);
+				console.verbose(`${debugPrefix}.ensureCurrentHash: file='${file.path}' computed file.hash=..${hash.substr(-6)}`);
+				resolve(artefact);
 			})
 			.catch(err => ensureCurrentHashHandleError(err, 'hash error', reject))
 			.done();
 		} else {
-			model.stats.ensureCurrentHash.hashValid++;
-			console.verbose(`${debugPrefix}.ensureCurrentHash: current file.hash=..${file.hash.substr(-6)}, no action required`);
-			resolve(file.$parent);
+			stats.ensureCurrentHash.hashValid++;
+			console.verbose(`${debugPrefix}.ensureCurrentHash: file='${file.path}' current file.hash=..${file.hash.substr(-6)}, no action required`);
+			resolve(artefact);
 		}
 	});
 
@@ -86,7 +88,7 @@ fileSchema.methods.ensureCurrentHash = function(cb) {
 			prefix = 'Error';
 		}
 		console.warn(prefix + ': ' + err);//.stack||err.message||err);
-		model.stats.ensureCurrentHash.errors.push(err);
+		stats.ensureCurrentHash.errors.push(err);
 		if (cb) process.nextTick(() => cb(err));
 	}
 };
@@ -126,49 +128,5 @@ fileSchema.aggregates = {
 	  	];
 	}
 };
-
-// So it seems that when a schema is used as a child schema (subdocument), schema.on('init') never fires
-// Normally schema.on('init') normally signals the model has been built - but it's not exactly a model when its a subdoc, so I guess it makes sense?
-// One thing to note that isn't clear in mongoose doc's: on('init') signals the model has been built for schema, hpwever the pre() and post('init')
-// middlewares are -entirely different- : They are connected to creation of a new -document- (or subdocument? still seems to fire them when used as a subdoc)
-fileSchema.on('init', function onFileSchemaInit(model, ...args) {
-	var debugPrefix = `model:${_model.modelName}`;
-	console.debug(`${debugPrefix}:fileSchema.on(init): model=${inspectPretty(_model)}, args=${inspectPretty(args)}, this=${inspectPretty(this)}`);
-});
-
-fileSchema.pre('init', function(pojo, ...args) {
-	console.debug(`fileSchema.pre(init): pojo=${inspectPretty(pojo)} args=${inspectPretty(args)}, this=${inspectPretty(this)}`);
-});
-
-fileSchema.post('init', function(doc, ...args) {
-	console.debug(`fileSchema.post(init): doc=${inspectPretty(doc)} args=${inspectPretty(args)}, this=${inspectPretty(this)}`);
-});
-
-fileSchema.pre('validate', function(next) {
-	// var model = this.constructor;
-	console.verbose(`fileSchema.pre('validate'): isNew=${this.isNew} isModified=${this.isModified()} modified=${this.modifiedPaths().join(', ')}`);
-	// console.verbose(`fileSchema.pre('validate'): model=${model} isNew=${this.isNew} isModified=${this.isModified()} modified=${this.modifiedPaths().join(', ')} parent=${inspectPretty(this.$parent)} $__=${inspectPretty(this.$__)}\n\tdoc=${_.keys(this).join(', ')}`);
-	next();
-});
-
-fileSchema.pre('save', function(next) {
-	console.verbose(`fileSchema.pre('save'): isNew=${this.isNew} isModified=${this.isModified()} modified=${this.modifiedPaths().join(', ')}\n\tdoc=${inspectPretty(this)}`);
-	next();
-});
-
-fileSchema.post('save', function() {
-	console.verbose(`fileSchema.post('save'): isNew=${this.isNew} isModified=${this.isModified()} modified=${this.modifiedPaths().join(', ')}\n\tdoc=${inspectPretty(this)}`);
-});
-
-fileSchema.pre('bulkSave', function(next) {
-	console.verbose(`fileSchema.pre('bulkSave'): isNew=${this.isNew} isModified=${this.isModified()} modified=${this.modifiedPaths().join(', ')}\n\tdoc=${inspectPretty(this)}`);
-	next();
-});
-
-fileSchema.post('bulkSave', function() {
-	console.verbose(`fileSchema.post('bulkSave'): isNew=${this.isNew} isModified=${this.isModified()} modified=${this.modifiedPaths().join(', ')}\n\tdoc=${inspectPretty(this)}`);
-});
-
-console.verbose(`fileSchema: ${inspectPretty(fileSchema)}`);
 
 module.exports = fileSchema;

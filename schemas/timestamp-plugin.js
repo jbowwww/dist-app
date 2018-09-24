@@ -1,5 +1,5 @@
 "use strict";
-const console = require('../stdio.js').Get('schemas/timestamp-plugin', { minLevel: 'verbose' });	// log verbose debug
+const console = require('../stdio.js').Get('schemas/timestamp-plugin', { minLevel: 'log' });	// log verbose debug
 // const inspect = require('./utility.js').makeInspect({ depth: 2, compact: true /* false */ });
 const inspectPretty = require('../utility.js').makeInspect({ depth: 2, compact: false });
 // const util = require('util');
@@ -32,7 +32,7 @@ module.exports = function timestampSchemaPlugin(schema, options) {
 			this._ts.updatedAt = this._ts.createdAt;
 		}
 		this._ts.checkedAt = now;	// changing semantics slightly to always update checkedAt, even if updatedAt updated. Hopefully makes querying for outdated data simpler by only requireing one comparison
-		console.verbose(`${model.modelName}.pre('validate')#timestampSchemaPlugin: actionType=${actionType} isNew=${this.isNew} ${this.modifiedPaths().join(' ')} this=${inspectPretty(this.schema)} parent=${inspectPretty(this.$parent)}`);
+		console.verbose(`${model.modelName}.pre('validate')#timestampSchemaPlugin: actionType=${actionType} isNew=${this.isNew} ${this.modifiedPaths().join(' ')}`); //this=${inspectPretty(this.schema)} parent=${inspectPretty(this.$parent)}`);
 		return next();
 	});
 

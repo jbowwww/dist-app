@@ -1,6 +1,5 @@
 "use strict";
-
-const console = require('../stdio.js').Get('schemas/artefact', { minLevel: 'verbose' });	// log verbose debug
+const console = require('../stdio.js').Get('schemas/artefact', { minLevel: 'log' });	// log verbose debug
 const inspect = require('../utility.js').makeInspect({ depth: 2, compact: true /* false */ });
 const inspectPretty = require('../utility.js').makeInspect({ depth: 2, compact: false });
 const util = require('util');
@@ -9,65 +8,30 @@ const Q = require('q');
 const mongoose = require('mongoose');
 const timestampPlugin = require('./timestamp-plugin.js');
 
-var artefactSchema = new mongoose.Schema({ });
-var isBulkSave = false;
 
-artefactSchema.plugin(timestampPlugin);
 
-artefactSchema.on('init', function onSchemaInit(_model, ...args) {
-	var debugPrefix = `model:${_model.modelName}`;
-	console.debug(`${debugPrefix}:artefactSchema.on(init): model=${inspectPretty(_model)}, args=${inspectPretty(args)}, this=${inspectPretty(this)}`);
-	var schema = this;
+function getNewStatsObject() { return {				// 180902 TODO: These stats could do with a little re-think - how what & where/when can i collect best stats - theyre a bit inconsistent atm e.g. saved count is pre-error/success where bulkWrites is only on success  
+	bulkOps: 0, bulkOpSuccess: 0, bulkWrites: 0,	// how many bulksave operations have been done, how many operations succeeded, how many documents have been written
+	saved: 0, validated: 0,							// # of save() calls, validate() calls
+	created: 0, updated: 0,	checked: 0,				// #of new docs in db (doc.isNew==true), # updated (doc.isModifed()==true), #docs save()'d bulkSave()'d but were not modifed
+	errors: []
+} };
 
-	// Object.defineProperty(_model, 'artefactTypes', { value: _.fromPairs(_.keys(schema.paths).filter(key => key[0] !== '_').map(key => [ key, {
-	// 	findOrCreate(query, data, cb) { return _model.findOrCreate(key, query, data, cb); }
-	// } ])) });
-
-	// Fairly sure I have to assign the new aggregate function using defineProperty, pretty sure I can't override it using schema.static() etc
-	var baseAggregate = _model.aggregate;
-	Object.defineProperty(_model, 'aggregate', { value: function aggregate(...args) {
-		var model = this;
-		var debugPrefix = `[${typeof model} ${model.modelName}]`;
-		console.debug(`${debugPrefix} baseAggregate=${inspect(baseAggregate)}`);
+artefactSchema.on('init', function onSchemaInit(model, ...args) {
+	
+	var schema = model.schema;
+	console.debug(`artefactSchema.on(init): modelName=${model.modelName}, args=${inspectPretty(args)}`);
+	
+	var baseAggregate = model.aggregate;
+	Object.defineProperty(model, 'aggregate', { value: function aggregate(...args) {	// Fairly sure I have to assign the new aggregate function using defineProperty, pretty sure I can't override it using schema.static() etc
 		var agg = _.assign(baseAggregate.call(model, ...args), _.mapValues(model.schema.aggregates || {}, (aggValue, aggName) => (function (...args) {
 			this.append(model.schema.aggregates[aggName](...args));
 			return this;
 		})));
-
-		// Object.setPrototypeOf(agg, aggProto);
-		console.debug(`${debugPrefix}.aggregate(${args.map(arg=>inspect(arg)).join(', ')})}: agg=${inspect(agg, { compact: false })}`);//`\naggProto=${inspect(aggProto)}`);
+		console.debug(`model:${model.modelName}.aggregate(${args.map(arg=>inspect(arg)).join(', ')})}: agg=${inspect(agg, { compact: false })}`);
 		return agg;
 	}});
 
-	Object.defineProperty(_model, 'stats', { value: {	// 180902 TODO: These stats could do with a little re-think - how what & where/when can i collect best stats - theyre a bit inconsistent atm e.g. saved count is pre-error/success where bulkWrites is only on success  
-		bulkOps: 0, bulkOpSuccess: 0,	bulkWrites: 0,	// how many bulksave operations have been done, how many operations succeeded, how many documents have been written
-		saved: 0, validated: 0,							// number of objects stored in db using save()
-		created: 0,										// number of objects stored in db were inserted because doc.isNew == true
-		updated: 0,										// number of objects stored in db that were updated because doc.isNew == false, doc._id !== null && doc.isModified() === true
-		checked: 0,										// number of objects that were passed to doc.store() that were not new or modified, and so did not require db actions
-		found: 0,										// results found pre-existing in db in model.findOrCreate()
-		constructed: 0,									// results from model.findOrCreate that were constructed using new Model()
-		errors: [],
-		_extraFields: [],							// extra field names to include in inspect() 'e.g. ensureCurrentHash' on file artefact
-		format(indent = 1) {
-			return `\n`
-			 +	`${'\t'.repeat(indent)}saved: ${this.saved}, validated: ${this.validated}, created: ${this.created}, updated: ${this.updated}, checked: ${this.checked}`
-			 +	`${'\t'.repeat(indent)}found: ${this.found}, constructed: ${this.constructed},\n`
-			 +	`${'\t'.repeat(indent)}bulkOps: ${this.bulkOps}, bulkOpSuccess: ${this.bulkOpSuccess}, bulkWrites: ${this.bulkWrites}, errors (${this.errors.length}):`
-			 +	this.errors.map(errString => '\n' + '\t'.repeat(indent) + errString)
-			 +	this._extraFields.map(field => '\n' + '\t'.repeat(indent) + field + ': '
-			 	+ (this[field].format ? this[field].format(indent + 1)
-			 	: this[field].toString()));
-		}
-	} });
-});
-
-artefactSchema.pre('init', function(pojo, ...args) {
-	console.debug(`artefactSchema.pre(init): pojo=[${pojo.constructor.name}]${inspectPretty(pojo)} args=${inspectPretty(args)}, this=${inspectPretty(this)}`);
-});
-
-artefactSchema.post('init', function(doc, ...args) {
-	console.debug(`artefactSchema.post(init): doc=[${doc.constructor.name}]${inspectPretty(doc)} args=${inspectPretty(args)}, this=${inspectPretty(this)}`);
 });
 
 artefactSchema.post('save', function(next) {
@@ -80,12 +44,7 @@ artefactSchema.post('save', function(next) {
 
 artefactSchema.pre('validate', function(next) {
 	var model = this.constructor;
-	// var hasParent = !!this.$parent;
-	// console.verbose(`${model.modelName}.pre('validate'): ${isBulkSave == !this.isNew ? '!! clocked !!' : '-- no bulksave --'}`);
 	model.stats.validated++;
-	// var actionType = this.isNew ? 'created' : (this.isModified() && this.modifiedPaths().length > 2) ? 'updated' : 'checked';
-	// model.stats[actionType]++;
-	// console.debug(`${model.modelName}.pre('validate'): action=${actionType}: modified=${this.modifiedPaths().join(' ')} doc=${inspectPretty(this._doc)}`);
 	next();
 });
 
@@ -93,9 +52,7 @@ artefactSchema.method('bulkSave', function(maxBatchSize = 10, batchTimeout = 750
 	var model = this.constructor;
 	var doc = this;
 	return Q.Promise((resolve, reject, notify) => {
-		isBulkSave = true;
 		this.validate(function(error) {	// 180902: Shuold I really be validating here? does mongoose validate automagically on create/update? see model.stats
-			isBulkSave = false;
 			if (error) {
 				console.warn(`${model.modelName}.bulkSave(maxBatchSize=${maxBatchSize}, batchTimeout=${batchTimeout}): validation err=${error} for doc=${inspectPretty(doc._doc)}`);
 				model.stats.errors.push(error);
@@ -144,7 +101,7 @@ artefactSchema.method('bulkSave', function(maxBatchSize = 10, batchTimeout = 750
 					.then(bulkWriteOpResult => {
 						model.stats.bulkOpSuccess++;
 						console.debug(`${model.modelName}.bulkSave(): bulkWriteOpResult=${inspectPretty(bulkWriteOpResult)}`);
-					}).done();
+					});//.done();
 				}
 			}
 		});
@@ -176,31 +133,43 @@ artefactSchema.method('updateDocument', function updateDocument(update, pathPref
 	return Q(this);
 });
 
+function mapQuery(dataTypeName, query) {
+	return _.mapKeys(query, (value, key, obj) => key[0] === '$' ? key : dataTypeName + '.' + key);
+}
+
 artefactSchema.static('findOrCreate', function findOrCreate(dataTypeName, query, data, cb) {
-	let mappedQuery = _.mapKeys(query, (value, key, obj) => key[0] === '$' ? key : dataTypeName + '.' + key);
-	return this.findOne(mappedQuery)
+	let mappedQuery = mapQuery(dataTypeName, query);// _.mapKeys(query, (value, key, obj) => key[0] === '$' ? key : dataTypeName + '.' + key);
+	return Q(this.findOne(mappedQuery)
 	.then(r =>	r
 	?	r.updateDocument(data, dataTypeName)
-	:  	(new this({ [dataTypeName]: data })))
-	.tap(r => console.debug(`artefactSchema.findOrCreate('${dataTypeName}', ${inspect(query)}, data=${data?"...":data===null?"null":"undefined"}: mappedQuery=${inspect(mappedQuery)}, r = ${inspectPretty(r)}`));
+	:  	(new this({ [dataTypeName]: data }))))
+	// .tap(r => console.debug(`artefactSchema.findOrCreate('${dataTypeName}', ${inspect(query)}, data=${data?"...":data===null?"null":"undefined"}: mappedQuery=${inspect(mappedQuery)}, r = ${inspectPretty(r)}`));
 });
 
-module.exports = function artefactMakeModel(modelName, artefactTypes) {
-	let _artefactSchema = artefactSchema.clone();
+module.exports = function artefactMakeModel(collectionName, artefactTypes) {
+	var artefactSchema = new mongoose.Schema({ });
+artefactSchema.plugin(timestampPlugin);
 	if (artefactTypes) {
-		_.forEach(artefactTypes, (plugin, name) => {
-			_artefactSchema.plugin(plugin, { typeName: name });
+		_.forEach(artefactTypes, (type, typeName) => {
+			console.log(`artefactMakeModel('${collectionName}', ${inspect(artefactTypes)}): artefactType: ${name}: ${plugin}`);
+			_artefactSchema.plugin(type, { typeName: name });
 			// _artefactSchema.path(name).schema.plugin(timestampPlugin);
 		});
 	}
-	let m = mongoose.model(modelName, _artefactSchema);
-	Object.defineProperty(m, 'artefactTypes', {
-		value: _.fromPairs(_.keys(artefactTypes).map(typeName => [typeName, _.assign({
-			findOrCreate(query, data, cb) { return m.findOrCreate(typeName, query, data, cb); }
-		}, artefactTypes[typeName]._statics || {}) ])),
-		writeable: false,
-		configurable: false
-	});
-	console.debug(`artefactMakeModel('${modelName}', ${inspectPretty(artefactTypes)}, m.artefactTypes=${inspectPretty(m.artefactTypes)}`);
+	let m = mongoose.model(collectionName, _artefactSchema);
+	Object.defineProperties(m, _.mapValues(artefactTypes, (type, typeName) => ({
+		 typeName, {
+			value: _.assign({
+					findOrCreate(query, data, cb) { return m.findOrCreate(typeName, query, data, cb); },
+					find(query, cb) { return m.find(mapQuery(typeName, query)); },
+					_stats: getNewStatsObject()
+				},
+				artefactTypes[typeName]._statics || {} ),
+			writeable: false,
+			configurable: false
+		}
+	})))
+	] )));
+	console.debug(`artefactMakeModel('${collectionName}', ${inspectPretty(artefactTypes)}, m.artefactTypes=${inspectPretty(m.artefactTypes)}`);
 	return m;
 };
