@@ -8,5 +8,5 @@ const Q = require('q');
 const mongoose = require('mongoose');
 const timestampPlugin = require('./timestamp-plugin.js');
 
-module.exports = function schema(fields, )
+module.exports = function schema(schemaObj, )
 

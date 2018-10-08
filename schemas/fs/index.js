@@ -20,4 +20,7 @@ function fileSystemPlugin(artefactSchema, options) {
 	artefactSchema.path(typeName).discriminator('file', fileSchema);
 }
 
+fileSystemPlugin._statics = {
+	
+}
 module.exports = fileSystemPlugin;

@@ -1,5 +1,5 @@
 "use strict";
-const console = require('../../../stdio.js').Get('bin/fs/tasks/create', { minLevel: 'verbose' });	// verbose debug log
+const console = require('../../../stdio.js').Get('bin/fs/tasks/create', { minLevel: 'debug' });	// verbose debug log
 const _ = require('lodash');
 const inspectPretty = require('util').inspect;
 const inspect = function inspect(obj) { return (require('util').inspect)(obj, { compact: true }); }
@@ -10,7 +10,6 @@ mongoose.connect("mongodb://localhost:27017/ArtefactsJS", { useNewUrlParser: tru
 const sourcePipe = require('../../source-pipe.js')
 const artefactModel = require('../model.js');
 
-console.debug(`artefactModel = ${inspectPretty(_.pick(artefactModel, _.keys(artefactModel.prototype)))}`);
 
 var scanParameters = [
 	{ path: '/home', maxDepth: 3 }
@@ -32,6 +31,7 @@ var actions = {
 };
 
 sourcePipe(sources.fsScan(scanParameters[0]), [
+	(data) => { console.debug(`artefactModel = ${inspectPretty(_.pick(artefactModel, _.keys(artefactModel.prototype)))}`); return data; },
 	actions.dbFindOrCreate('fs'),
 	actions.fileHash(),
 	actions.dbBulkSave()

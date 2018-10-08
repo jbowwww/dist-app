@@ -31,9 +31,9 @@ fileSchema.methods.ensureCurrentHash = function(cb) {
 	var file = this;
 	var artefact = this.$parent;
 	var model = this.constructor;
-	var stats = artefact.constructor.stats; //artefact.artefactTypes.stats.subTypes.
-	// console.verbose(`${debugPrefix}.ensureCurrentHash():  file='${file.path}' artfeact=${inspectPretty(artefact)} model=${inspect(model)}`)
-	var debugPrefix = `[${typeof model} ${model.name}]`;
+	var debugPrefix = `[${typeof model} ${model.modelName}]`;
+	console.verbose(`${debugPrefix}.ensureCurrentHash():  file='${file.path}' artfeact=${inspectPretty(artefact)} model=${inspectPretty(model)} this.constructor=${this.constructor} this.constructor.prototype=${this.constructor.prototype}`)
+	var stats = model._stats;// artefact[model.modelName]._stats;// artefact.constructor._stats; //artefact.artefactTypes.stats.subTypes.
 	if (file.fileType !== 'file') {		// ensure is an actual file and nota dir or 'unknown' or otherwise
 		console.warn(`${debugPrefix}.ensureCurrentHash() called for ${model.name} data with fileType='${file.fileType}', should only be called for files!`);
 	}
